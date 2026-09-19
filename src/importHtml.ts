@@ -9,8 +9,8 @@ export interface ParsedImport {
   postId: string;
   displayName: string;
   username: string;
-  /** Author's Pickax verified badge (seal next to the display name). */
-  verified: boolean;
+  /** The account's verified badge (gold/blue), or null when it has none. */
+  verified: "gold" | "blue" | null;
   avatarUrl: string;
   text: string;
   timestamp: string;
@@ -111,17 +111,25 @@ function extractAxes(doc: Document): string {
 // Verified badge: the seal SVG (signature path "M12.7893 4.26666") renders in
 // a div right after the author's display name, inside the same header row as
 // the @username link. Scoped to that row so verified commenters elsewhere on
-// the page can't false-positive.
-function extractVerified(doc: Document): boolean {
+// the page can't false-positive. Returns the account's real badge color —
+// gold (fill-orange-300 / #FDBA74, "Verified Creator") or blue
+// (fill-blue-*/fill-sky-* / #3EB1F9) — or null when the account has no badge.
+// A seal with no recognizable color defaults to gold.
+function extractVerified(doc: Document): "gold" | "blue" | null {
   const anchors = Array.from(doc.querySelectorAll('a[href^="/"]'));
   for (const a of anchors) {
     const t = (a.textContent ?? "").trim();
     if (t.startsWith("@") && t.length > 1) {
       const row = a.parentElement;
-      return !!row && row.innerHTML.includes("12.7893 4.26666");
+      const inner = row?.innerHTML ?? "";
+      if (!inner.includes("12.7893 4.26666")) return null;
+      const s = inner.toLowerCase();
+      return s.includes("3eb1f9") || /fill-(blue|sky)-\d{3}/.test(s)
+        ? "blue"
+        : "gold";
     }
   }
-  return false;
+  return null;
 }
 
 function extractTimestamp(doc: Document): string {
@@ -241,7 +249,14 @@ function coerceImport(raw: unknown): ParsedImport | null {
     postId: str(o.postId),
     displayName: str(o.displayName),
     username: str(o.username).replace(/^@+/, ""),
-    verified: o.verified === true,
+    // v2 bookmarklets send "gold"/"blue"/"" — v1 sent a boolean, where
+    // true meant the (gold) badge was present.
+    verified:
+      o.verified === "blue"
+        ? "blue"
+        : o.verified === "gold" || o.verified === true
+          ? "gold"
+          : null,
     avatarUrl: str(o.avatarUrl),
     text: cleanDescription(str(o.text)),
     timestamp: str(o.timestamp),
@@ -288,15 +303,17 @@ export const BOOKMARKLET: string =
   "var d=document," +
   "q=function(s){return d.querySelector(s)}," +
   "meta=function(p){var e=q('meta[property=\"'+p+'\"]');return e?e.getAttribute('content')||'':''}," +
-  "o={v:2,postId:'',displayName:(meta('og:title')||'').replace(/\\s+posted\\s*$/i,'')," +
+  "o={v:3,postId:'',displayName:(meta('og:title')||'').replace(/\\s+posted\\s*$/i,'')," +
   "text:(meta('og:description')||'').replace(/\\s*user=\\S+\\s+[\\d,]+\\s+Followers\\s*$/i,'')," +
-  "username:'',verified:!1,avatar:'',timestamp:'',picks:'',axes:'',views:'',videoSrc:'',videoTitle:'',videoThumb:'',images:[]};" +
+  "username:'',verified:'',avatar:'',timestamp:'',picks:'',axes:'',views:'',videoSrc:'',videoTitle:'',videoThumb:'',images:[]};" +
   "Array.prototype.forEach.call(d.querySelectorAll('a[href^=\"/\"]'),function(a){" +
   "var t=(a.textContent||'').trim();" +
   "if(t.charAt(0)==='@'&&t.length>1){" +
   "if(!o.username)o.username=t.slice(1).trim();" +
   "var pe=a.parentElement;" +
-  "if(pe&&pe.innerHTML.indexOf('12.7893 4.26666')>-1)o.verified=!0;" +
+  "if(pe&&pe.innerHTML.indexOf('12.7893 4.26666')>-1){" +
+  "var ph=pe.innerHTML.toLowerCase();" +
+  "o.verified=(ph.indexOf('3eb1f9')>-1||/fill-(blue|sky)-\\\\d{3}/.test(ph))?'blue':'gold';}" +
   "var s=a.nextElementSibling;" +
   "if(s&&s.tagName==='SPAN'&&s.getAttribute('title')&&!o.timestamp)o.timestamp=(s.textContent||'').trim();}});" +
   "var av=q('img.rounded-full[src*=\"img.pickax.com\"]');" +

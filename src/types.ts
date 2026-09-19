@@ -1,3 +1,12 @@
+/**
+ * The account's Pickax verified badge, exactly as the post shows it.
+ * Gold ("Verified Creator") or blue; null when the account has none.
+ * This always reflects the account's real state — it is detected from the
+ * post on import, or declared for the account in manual entry. It is never
+ * a user toggle: an account with a badge gets its badge, one without gets none.
+ */
+export type VerifiedBadge = "gold" | "blue" | null;
+
 // A post image that has already been loaded (from a file upload or URL)
 // so its natural dimensions are known before rendering.
 export interface LoadedImage {
@@ -35,8 +44,8 @@ export interface PostData {
   postId: string;
   displayName: string;
   username: string;
-  /** Pickax verified badge shown next to the display name. */
-  verified: boolean;
+  /** The account's verified badge (gold/blue), or null when it has none. */
+  verified: VerifiedBadge;
   avatar: HTMLImageElement | null;
   text: string;
   timestamp: string;
@@ -52,7 +61,6 @@ export interface RenderOptions {
   showViews: boolean;
   showMedia: boolean;
   showEngagement: boolean;
-  showVerified: boolean;
 }
 
 export const DEFAULT_RENDER_OPTIONS: RenderOptions = {
@@ -60,5 +68,4 @@ export const DEFAULT_RENDER_OPTIONS: RenderOptions = {
   showViews: true,
   showMedia: true,
   showEngagement: true,
-  showVerified: true,
 };

@@ -5,6 +5,8 @@
 
 export const WORKER_BASE = "https://pickax-post-api.masteringrumble.workers.dev";
 
+import type { VerifiedBadge } from "./types";
+
 export interface WorkerPostVideo {
   src: string;
   title: string;
@@ -24,7 +26,8 @@ export interface WorkerPostPayload {
   picks: string | null;
   axes: string | null;
   comments: string | null;
-  verified: boolean;
+  /** The account's verified badge (gold/blue), or null when it has none. */
+  verified: VerifiedBadge;
   images: string[];
   video: WorkerPostVideo | null;
   fetchedAt: string;

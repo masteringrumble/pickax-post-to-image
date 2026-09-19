@@ -47,8 +47,12 @@ export interface PostPayload {
   picks: string | null;
   axes: string | null;
   comments: string | null;
-  /** Author's Pickax verified badge (seal next to the display name). */
-  verified: boolean;
+  /**
+   * The account's verified badge, exactly as the post shows it: "gold"
+   * ("Verified Creator", #FDBA74) or "blue" (#3EB1F9), null when the
+   * account has none. Never a toggle — it mirrors the account's state.
+   */
+  verified: "gold" | "blue" | null;
   images: string[];
   video: { src: string; title: string; thumbnail: string | null } | null;
   fetchedAt: string;
@@ -123,11 +127,18 @@ export function extract(html: string, postId: string, postUrl: string): PostPayl
   // Verified badge: the seal SVG (signature path "M12.7893 4.26666") renders
   // in a div immediately after the author's display-name link. Scoped to the
   // header so verified commenters elsewhere on the page can't false-positive.
-  let verified = false;
+  // The seal's color is the account's real badge: gold (fill-orange-300 /
+  // #FDBA74, "Verified Creator") or blue (fill-blue-*/fill-sky-* / #3EB1F9).
+  // A seal with no recognizable color defaults to gold — every public badge
+  // observed is gold. No seal at all means the account has none.
+  let verified: "gold" | "blue" | null = null;
   if (nameMatch && typeof nameMatch.index === "number") {
-    verified = html
-      .slice(nameMatch.index, nameMatch.index + 2000)
-      .includes("12.7893 4.26666");
+    const slice = html.slice(nameMatch.index, nameMatch.index + 2000);
+    if (slice.includes("12.7893 4.26666")) {
+      const s = slice.toLowerCase();
+      verified =
+        s.includes("3eb1f9") || /fill-(blue|sky)-\d{3}/.test(s) ? "blue" : "gold";
+    }
   }
   const timeMatch = html.match(
     /@[\w.]+<\/a><span title="([^"]+)"[^>]*>([^<>]{1,40})<\/span>/

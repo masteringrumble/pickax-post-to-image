@@ -171,7 +171,7 @@ async function main() {
       postId: "707864",
       displayName: "Misfit Electronic Gaming",
       username: "misfit_electronic_gaming",
-      verified: true,
+      verified: "gold",
       avatar: null,
       text: "Come hang out! 🔴 LIVE now.",
       timestamp: "",
@@ -201,7 +201,7 @@ async function main() {
       postId: "707864",
       displayName: "Misfit Electronic Gaming",
       username: "misfit",
-      verified: true,
+      verified: "gold",
       avatar: null,
       text,
       timestamp: "Sep 19, 2026",
@@ -242,12 +242,12 @@ async function main() {
       return { img: im as unknown as HTMLImageElement, width: w, height: h };
     };
     const one: any = await renderPostImage({
-      postId: "1", displayName: "A", username: "a", verified: false,
+      postId: "1", displayName: "A", username: "a", verified: null,
       avatar: mkImg(200, 200).img,
       text: "with image", timestamp: "", images: [mkImg(1600, 900)], engagement: {},
     });
     const three: any = await renderPostImage({
-      postId: "2", displayName: "A", username: "a", verified: false, avatar: null,
+      postId: "2", displayName: "A", username: "a", verified: null, avatar: null,
       text: "three images", timestamp: "",
       images: [mkImg(800, 800), mkImg(1200, 600), mkImg(600, 1200)], engagement: {},
     });
@@ -266,7 +266,7 @@ async function main() {
   // ---- 7. renderer: missing data omitted, never invented ---------------------
   {
     const canvas: any = await renderPostImage({
-      postId: "9", displayName: "", username: "", verified: false, avatar: null,
+      postId: "9", displayName: "", username: "", verified: null, avatar: null,
       text: "minimal", timestamp: "", images: [], engagement: {},
     });
     const texts = canvas._ctx.calls.filter((c: any) => c[0] === "fillText").map((c: any) => c[1]);
@@ -342,7 +342,7 @@ async function main() {
     assert.equal(p.postId, "707864");
     assert.equal(p.displayName, "Misfit Electronic Gaming");
     assert.equal(p.username, "MisfitElectronicGaming");
-    assert.equal(p.verified, true, "verified badge detected");
+    assert.equal(p.verified, "gold", "gold verified badge detected");
     assert.equal(
       p.avatarUrl,
       "https://img.pickax.com/user-8356/ea28e48e-147a-4169-bb97-ba71a823d48f.jpeg"
@@ -388,6 +388,47 @@ async function main() {
       console.log("ok  video thumbnail extraction");
     }
 
+    // Verified badge follows the account: blue seal -> blue, no seal -> none.
+    {
+      const blueHtml = FIXTURE_HTML.replace("fill-orange-300", "fill-blue-400");
+      assert.strictEqual(
+        parsePostHtml(blueHtml).verified,
+        "blue",
+        "blue seal detected as blue"
+      );
+      const noSeal = FIXTURE_HTML.replace(
+        /<div class="w-5 h-5 icon[^]*?<\/div>/,
+        ""
+      );
+      assert.strictEqual(
+        parsePostHtml(noSeal).verified,
+        null,
+        "no seal means no badge"
+      );
+      console.log("ok  verified badge color detection (gold/blue/none)");
+    }
+
+    // Legacy v1 bookmarklets sent verified:true — still honored as gold.
+    {
+      const legacy = {
+        v: 1,
+        displayName: "A",
+        username: "a",
+        verified: true,
+        text: "hi",
+      };
+      (globalThis as any).window = {
+        location: {
+          hash: "#import=" + encodeURIComponent(JSON.stringify(legacy)),
+        },
+        history: { replaceState() {} },
+      };
+      const parsed = parseImportHash();
+      delete (globalThis as any).window;
+      assert.strictEqual(parsed?.verified, "gold", "legacy boolean maps to gold");
+      console.log("ok  legacy bookmarklet verified flag");
+    }
+
     // The real bookmarklet code, executed against the fixture DOM.
     const dom = new JSDOM(FIXTURE_HTML, {
       url: "https://pickax.com/post/707864",
@@ -421,7 +462,7 @@ async function main() {
     assert.equal(payload.postId, "707864");
     assert.equal(payload.displayName, "Misfit Electronic Gaming");
     assert.equal(payload.username, "MisfitElectronicGaming");
-    assert.equal(payload.verified, true, "bookmarklet carries verified");
+    assert.equal(payload.verified, "gold", "bookmarklet carries verified color");
     assert.ok(payload.avatar.includes("img.pickax.com/user-8356"));
     assert.ok(!payload.text.includes("1311 Followers"));
     assert.equal(payload.picks, "1");

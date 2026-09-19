@@ -26,7 +26,8 @@ const PX = {
   pickTo: "#00c4f5",
   axeFrom: "#dc1919",
   axeTo: "#f59b00",
-  badgeOrange: "#FDBA74", // verified seal (Tailwind orange-300)
+  badgeOrange: "#FDBA74", // gold verified seal (Tailwind orange-300, measured)
+  badgeBlue: "#3EB1F9", // blue verified seal (measured from the Verification page)
 };
 
 // Verbatim SVG path data from Pickax's own icon set (user-supplied, 2026-09-19).
@@ -284,17 +285,19 @@ function drawActionIcon(
 }
 
 /**
- * Verified badge next to the display name, as on the post: the orange-300
- * seal; the check is a transparent cutout (evenodd), so the card shows
- * through exactly like the site's CSS override does.
+ * Verified badge next to the display name, as on the post: the seal in the
+ * account's own color — gold #FDBA74 ("Verified Creator") or blue #3EB1F9.
+ * The check is a transparent cutout (evenodd), so the card shows through
+ * exactly like the site's CSS override does.
  */
 function drawVerifiedBadge(
   ctx: CanvasRenderingContext2D,
   x: number,
   cy: number,
-  size: number
+  size: number,
+  color: string
 ): void {
-  drawSvgPath(ctx, BADGE_PATH, 32, x + size / 2, cy, size, PX.badgeOrange, "evenodd");
+  drawSvgPath(ctx, BADGE_PATH, 32, x + size / 2, cy, size, color, "evenodd");
 }
 
 function drawPlayButton(
@@ -505,10 +508,17 @@ export async function renderPostImage(
   ctx.restore();
 
   const nameX = cx0 + AVATAR + 28;
-  const showBadge = data.verified && o.showVerified;
+  // The badge is the account's own: gold or blue when the account has one,
+  // absent when it doesn't. Never a toggle.
+  const badgeColor =
+    data.verified === "blue"
+      ? PX.badgeBlue
+      : data.verified === "gold"
+        ? PX.badgeOrange
+        : null;
   const BADGE_S = 40;
   const nameMaxW =
-    CONTENT_W - AVATAR - 28 - (o.showLogo ? LOGO_W + 24 : 0) - (showBadge ? BADGE_S + 14 : 0);
+    CONTENT_W - AVATAR - 28 - (o.showLogo ? LOGO_W + 24 : 0) - (badgeColor ? BADGE_S + 14 : 0);
   // The handle/timestamp row has no badge, so it keeps the full width.
   const metaMaxW = CONTENT_W - AVATAR - 28 - (o.showLogo ? LOGO_W + 24 : 0);
   let ny = y + 50;
@@ -517,10 +527,10 @@ export async function renderPostImage(
     ctx.font = font(44, 700);
     const shownName = truncate(ctx, displayName, nameMaxW);
     ctx.fillText(shownName, nameX, ny);
-    if (showBadge) {
+    if (badgeColor) {
       // Verified seal sits right after the name, as on the post.
       const nameW = ctx.measureText(shownName).width;
-      drawVerifiedBadge(ctx, nameX + nameW + 14, ny - 16, BADGE_S);
+      drawVerifiedBadge(ctx, nameX + nameW + 14, ny - 16, BADGE_S, badgeColor);
     }
     ny += 56;
   }

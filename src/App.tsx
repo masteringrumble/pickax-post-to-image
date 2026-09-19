@@ -21,6 +21,7 @@ import {
   type LoadedImage,
   type PostData,
   type RenderOptions,
+  type VerifiedBadge,
 } from "./types";
 import "./styles.css";
 
@@ -101,7 +102,7 @@ async function postDataFromWorker(
     postId: p.postId,
     displayName: p.displayName ?? "",
     username: (p.username ?? "").replace(/^@+/, ""),
-    verified: p.verified ?? false,
+    verified: p.verified ?? null,
     avatar,
     text: (p.text ?? "").replace(/\r\n/g, "\n"),
     timestamp: p.timeAgo || p.timestamp || "",
@@ -134,7 +135,9 @@ export default function App() {
   const [picks, setPicks] = useState("");
   const [axes, setAxes] = useState("");
   const [views, setViews] = useState("");
-  const [verified, setVerified] = useState(false);
+  // The account's verification state, as the account actually has it.
+  // Never a toggle: gold/blue when the account has that badge, null when none.
+  const [verified, setVerified] = useState<VerifiedBadge>(null);
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
   const [avatarUrl, setAvatarUrl] = useState("");
   const [imageFiles, setImageFiles] = useState<File[]>([]);
@@ -170,7 +173,7 @@ export default function App() {
     setPicks("");
     setAxes("");
     setViews("");
-    setVerified(false);
+    setVerified(null);
     setAvatarFile(null);
     setImageFiles([]);
     setImageUrl("");
@@ -557,14 +560,27 @@ export default function App() {
                 />
               </div>
             </div>
-            <label className="toggle manual-verified">
-              <input
-                type="checkbox"
-                checked={verified}
-                onChange={(e) => setVerified(e.target.checked)}
-              />
-              Verified account (orange badge next to the name)
-            </label>
+            <div>
+              <label className="field-label" htmlFor="verified-badge">
+                Account verification
+              </label>
+              <select
+                id="verified-badge"
+                className="text-input"
+                value={verified ?? ""}
+                onChange={(e) =>
+                  setVerified(
+                    e.target.value === ""
+                      ? null
+                      : (e.target.value as VerifiedBadge)
+                  )
+                }
+              >
+                <option value="">Not verified</option>
+                <option value="gold">Gold badge (Verified Creator)</option>
+                <option value="blue">Blue badge</option>
+              </select>
+            </div>
 
             <label className="field-label" htmlFor="post-text">
               Post text
@@ -742,9 +758,6 @@ export default function App() {
               </label>
               <label className="toggle">
                 <input type="checkbox" {...toggle("showEngagement")} /> Picks &amp; axes
-              </label>
-              <label className="toggle">
-                <input type="checkbox" {...toggle("showVerified")} /> Verified badge
               </label>
             </fieldset>
             <div className="btn-row center">
