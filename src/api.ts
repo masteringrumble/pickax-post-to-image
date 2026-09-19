@@ -23,6 +23,7 @@ export interface WorkerPostPayload {
   picks: string | null;
   axes: string | null;
   comments: string | null;
+  verified: boolean;
   images: string[];
   video: WorkerPostVideo | null;
   fetchedAt: string;

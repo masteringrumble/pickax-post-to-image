@@ -92,6 +92,7 @@ async function postDataFromWorker(
     postId: p.postId,
     displayName: p.displayName ?? "",
     username: (p.username ?? "").replace(/^@+/, ""),
+    verified: p.verified ?? false,
     avatar,
     text: (p.text ?? "").replace(/\r\n/g, "\n"),
     timestamp: p.timeAgo || p.timestamp || "",
@@ -122,6 +123,7 @@ export default function App() {
   const [picks, setPicks] = useState("");
   const [axes, setAxes] = useState("");
   const [views, setViews] = useState("");
+  const [verified, setVerified] = useState(false);
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
   const [imageFiles, setImageFiles] = useState<File[]>([]);
   const [imageUrl, setImageUrl] = useState("");
@@ -156,6 +158,7 @@ export default function App() {
     setPicks("");
     setAxes("");
     setViews("");
+    setVerified(false);
     setAvatarFile(null);
     setImageFiles([]);
     setImageUrl("");
@@ -236,6 +239,7 @@ export default function App() {
       postId: p.postId,
       displayName: p.displayName,
       username: p.username,
+      verified: p.verified,
       avatar,
       text: p.text.replace(/\r\n/g, "\n"),
       timestamp: prettyTimestamp(p.timestamp),
@@ -354,6 +358,7 @@ export default function App() {
         postId,
         displayName: displayName.trim(),
         username: username.trim().replace(/^@+/, ""),
+        verified,
         avatar,
         text: text.replace(/\r\n/g, "\n"),
         timestamp: timestamp.trim(),
@@ -523,6 +528,14 @@ export default function App() {
                 />
               </div>
             </div>
+            <label className="toggle manual-verified">
+              <input
+                type="checkbox"
+                checked={verified}
+                onChange={(e) => setVerified(e.target.checked)}
+              />
+              Verified account (orange badge next to the name)
+            </label>
 
             <label className="field-label" htmlFor="post-text">
               Post text
@@ -691,6 +704,9 @@ export default function App() {
               </label>
               <label className="toggle">
                 <input type="checkbox" {...toggle("showEngagement")} /> Picks &amp; axes
+              </label>
+              <label className="toggle">
+                <input type="checkbox" {...toggle("showVerified")} /> Verified badge
               </label>
             </fieldset>
             <div className="btn-row center">

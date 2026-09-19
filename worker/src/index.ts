@@ -47,6 +47,8 @@ export interface PostPayload {
   picks: string | null;
   axes: string | null;
   comments: string | null;
+  /** Author's Pickax verified badge (seal next to the display name). */
+  verified: boolean;
   images: string[];
   video: { src: string; title: string } | null;
   fetchedAt: string;
@@ -98,6 +100,16 @@ export function extract(html: string, postId: string, postUrl: string): PostPayl
     /<a href="\/[\w.]+"[^>]*class="[^"]*text-sm[^"]*"[^>]*>@([\w.]+)<\/a>/
   );
   const username = handleMatch ? handleMatch[1] : nameMatch ? nameMatch[1] : null;
+
+  // Verified badge: the seal SVG (signature path "M12.7893 4.26666") renders
+  // in a div immediately after the author's display-name link. Scoped to the
+  // header so verified commenters elsewhere on the page can't false-positive.
+  let verified = false;
+  if (nameMatch && typeof nameMatch.index === "number") {
+    verified = html
+      .slice(nameMatch.index, nameMatch.index + 2000)
+      .includes("12.7893 4.26666");
+  }
   const timeMatch = html.match(
     /@[\w.]+<\/a><span title="([^"]+)"[^>]*>([^<>]{1,40})<\/span>/
   );
@@ -150,6 +162,7 @@ export function extract(html: string, postId: string, postUrl: string): PostPayl
     picks,
     axes,
     comments,
+    verified,
     images,
     video,
     fetchedAt: new Date().toISOString(),

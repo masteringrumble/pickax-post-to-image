@@ -33,6 +33,8 @@ export interface PostData {
   postId: string;
   displayName: string;
   username: string;
+  /** Pickax verified badge shown next to the display name. */
+  verified: boolean;
   avatar: HTMLImageElement | null;
   text: string;
   timestamp: string;
@@ -48,6 +50,7 @@ export interface RenderOptions {
   showViews: boolean;
   showMedia: boolean;
   showEngagement: boolean;
+  showVerified: boolean;
 }
 
 export const DEFAULT_RENDER_OPTIONS: RenderOptions = {
@@ -55,4 +58,5 @@ export const DEFAULT_RENDER_OPTIONS: RenderOptions = {
   showViews: true,
   showMedia: true,
   showEngagement: true,
+  showVerified: true,
 };

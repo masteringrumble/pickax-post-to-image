@@ -9,6 +9,8 @@ export interface ParsedImport {
   postId: string;
   displayName: string;
   username: string;
+  /** Author's Pickax verified badge (seal next to the display name). */
+  verified: boolean;
   avatarUrl: string;
   text: string;
   timestamp: string;
@@ -104,6 +106,22 @@ function extractAxes(doc: Document): string {
   return buttonCount(doc, "dc1919");
 }
 
+// Verified badge: the seal SVG (signature path "M12.7893 4.26666") renders in
+// a div right after the author's display name, inside the same header row as
+// the @username link. Scoped to that row so verified commenters elsewhere on
+// the page can't false-positive.
+function extractVerified(doc: Document): boolean {
+  const anchors = Array.from(doc.querySelectorAll('a[href^="/"]'));
+  for (const a of anchors) {
+    const t = (a.textContent ?? "").trim();
+    if (t.startsWith("@") && t.length > 1) {
+      const row = a.parentElement;
+      return !!row && row.innerHTML.includes("12.7893 4.26666");
+    }
+  }
+  return false;
+}
+
 function extractTimestamp(doc: Document): string {
   // The relative timestamp sits in the <span title="Sep 19, 2026, 9:11 PM">
   // right after the author's @username link.
@@ -157,6 +175,7 @@ export function parsePostHtml(html: string): ParsedImport {
     postId,
     displayName,
     username,
+    verified: extractVerified(doc),
     avatarUrl,
     text,
     timestamp: extractTimestamp(doc),
@@ -203,6 +222,7 @@ function coerceImport(raw: unknown): ParsedImport | null {
     postId: str(o.postId),
     displayName: str(o.displayName),
     username: str(o.username).replace(/^@+/, ""),
+    verified: o.verified === true,
     avatarUrl: str(o.avatarUrl),
     text: cleanDescription(str(o.text)),
     timestamp: str(o.timestamp),
@@ -250,11 +270,13 @@ export const BOOKMARKLET: string =
   "meta=function(p){var e=q('meta[property=\"'+p+'\"]');return e?e.getAttribute('content')||'':''}," +
   "o={v:2,postId:'',displayName:(meta('og:title')||'').replace(/\\s+posted\\s*$/i,'')," +
   "text:(meta('og:description')||'').replace(/\\s*user=\\S+\\s+[\\d,]+\\s+Followers\\s*$/i,'')," +
-  "username:'',avatar:'',timestamp:'',picks:'',axes:'',views:'',videoSrc:'',videoTitle:'',images:[]};" +
+  "username:'',verified:!1,avatar:'',timestamp:'',picks:'',axes:'',views:'',videoSrc:'',videoTitle:'',images:[]};" +
   "Array.prototype.forEach.call(d.querySelectorAll('a[href^=\"/\"]'),function(a){" +
   "var t=(a.textContent||'').trim();" +
   "if(t.charAt(0)==='@'&&t.length>1){" +
   "if(!o.username)o.username=t.slice(1).trim();" +
+  "var pe=a.parentElement;" +
+  "if(pe&&pe.innerHTML.indexOf('12.7893 4.26666')>-1)o.verified=!0;" +
   "var s=a.nextElementSibling;" +
   "if(s&&s.tagName==='SPAN'&&s.getAttribute('title')&&!o.timestamp)o.timestamp=(s.textContent||'').trim();}});" +
   "var av=q('img.rounded-full[src*=\"img.pickax.com\"]');" +
