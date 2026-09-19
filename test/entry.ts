@@ -148,7 +148,7 @@ async function main() {
 
   // ---- 4. renderer: short post ----------------------------------------------
   {
-    const canvas = await renderPostImage({
+    const canvas: any = await renderPostImage({
       postId: "707864",
       displayName: "Misfit Electronic Gaming",
       username: "misfit_electronic_gaming",
@@ -177,7 +177,7 @@ async function main() {
       "🔴🚩LIVE | | Splaterday | | Halloween: The Game 🎃 #RumbleTakeover @gamingonrumble https://twitch.tv/misfit_electronic_gaming ";
     const text =
       Array(12).fill(para).join("\n\n") + "\n\n" + "supercalifragilisticexpialidocious".repeat(20);
-    const canvas = await renderPostImage({
+    const canvas: any = await renderPostImage({
       postId: "707864",
       displayName: "Misfit Electronic Gaming",
       username: "misfit",
@@ -220,12 +220,12 @@ async function main() {
       im.naturalHeight = h;
       return { img: im as unknown as HTMLImageElement, width: w, height: h };
     };
-    const one = await renderPostImage({
+    const one: any = await renderPostImage({
       postId: "1", displayName: "A", username: "a",
       avatar: mkImg(200, 200).img,
       text: "with image", timestamp: "", images: [mkImg(1600, 900)], engagement: {},
     });
-    const three = await renderPostImage({
+    const three: any = await renderPostImage({
       postId: "2", displayName: "A", username: "a", avatar: null,
       text: "three images", timestamp: "",
       images: [mkImg(800, 800), mkImg(1200, 600), mkImg(600, 1200)], engagement: {},
@@ -244,7 +244,7 @@ async function main() {
 
   // ---- 7. renderer: missing data omitted, never invented ---------------------
   {
-    const canvas = await renderPostImage({
+    const canvas: any = await renderPostImage({
       postId: "9", displayName: "", username: "", avatar: null,
       text: "minimal", timestamp: "", images: [], engagement: {},
     });
