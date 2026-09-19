@@ -456,9 +456,22 @@ export async function renderPostImage(
 
   // ---- measure text -------------------------------------------------------
   measure.font = font(40);
-  const lines = data.text
-    ? wrapText(data.text, WRAP_W, (t) => measure.measureText(t).width)
-    : [];
+  // Width must be computed EXACTLY the way drawRichLine advances: it draws
+  // word by word, so whole-string measurement (which applies cross-word
+  // kerning) disagrees with the drawn width and long lines spill past the
+  // card edge. Measure the same way the text is drawn: sum of word widths
+  // plus spaces. With no spaces in the string this is plain measureText.
+  const spaceW = measure.measureText(" ").width;
+  const textWidth = (t: string): number => {
+    const parts = t.split(" ");
+    let w = 0;
+    for (let i = 0; i < parts.length; i++) {
+      if (i > 0) w += spaceW;
+      w += measure.measureText(parts[i]).width;
+    }
+    return w;
+  };
+  const lines = data.text ? wrapText(data.text, WRAP_W, textWidth) : [];
   const TEXT_LH = 62;
   const textH = lines.length * TEXT_LH;
 

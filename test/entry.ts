@@ -50,7 +50,17 @@ function makeCtx(): any {
     measureText(text: string) {
       const m = this._font.match(/(\d+(?:\.\d+)?)px/);
       const px = m ? parseFloat(m[1]) : 40;
-      return { width: Array.from(text).length * px * 0.55 };
+      const n = Array.from(text).length;
+      // Simulate real cross-word kerning: a whole phrase measures tighter
+      // than the sum of its separately-measured words (kerning applies
+      // across word boundaries in the phrase, but not when words are drawn
+      // one fillText at a time). A renderer that wraps with whole-string
+      // measurement but draws word by word will overflow under this stub,
+      // exactly like the real Poppins bug did in production. A lone space
+      // gets no discount, matching drawRichLine's own space measurement.
+      const realWords = text.split(" ").filter((w) => w.length > 0);
+      const gaps = Math.max(0, realWords.length - 1);
+      return { width: Math.max(0, n * px * 0.55 - gaps * px * 0.08) };
     },
     scale() {},
     translate() {},
