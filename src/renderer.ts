@@ -8,11 +8,11 @@ import {
 
 // ---------------------------------------------------------------------------
 // Pickax dark theme — colors verified against pickax.com (2026-09-19).
-// The generated image mirrors the post card: dark card floating on the
-// darker page background, icon-only engagement buttons, views pill.
+// The generated image is the post card itself: dark card, icon-only
+// engagement buttons, views pill, and a footer with the post URL plus
+// the join link. No background outside the card.
 // ---------------------------------------------------------------------------
 const PX = {
-  page: "#0B101E", // page background behind the card
   card: "#222A39", // post card
   btn: "#333D52", // engagement buttons + views pill
   divider: "#394050",
@@ -66,9 +66,8 @@ const BADGE_PATH = makePath(BADGE_D);
 // ---------------------------------------------------------------------------
 const W = 1200;
 const SCALE = 2;
-const PAGE_PAD = 36; // page background margin around the card
 const CARD_PAD = 52; // padding inside the card
-const CONTENT_W = W - (PAGE_PAD + CARD_PAD) * 2;
+const CONTENT_W = W - CARD_PAD * 2;
 const CARD_RADIUS = 36;
 const AVATAR = 104;
 const LOGO_W = 190;
@@ -464,7 +463,7 @@ export async function renderPostImage(
   cardH += GAP_SECTION + FOOTER_TAIL + CARD_PAD;
   cardH = Math.max(cardH, 400);
 
-  const H = cardH + PAGE_PAD * 2;
+  const H = cardH;
 
   // ---- create canvas ------------------------------------------------------
   const canvas = document.createElement("canvas");
@@ -473,18 +472,16 @@ export async function renderPostImage(
   const ctx = canvas.getContext("2d")!;
   ctx.scale(SCALE, SCALE);
 
-  // page background, then the floating post card
-  ctx.fillStyle = PX.page;
-  ctx.fillRect(0, 0, W, H);
-  roundRectPath(ctx, PAGE_PAD, PAGE_PAD, W - PAGE_PAD * 2, cardH, CARD_RADIUS);
+  // the post card is the entire image — no background outside of it
+  roundRectPath(ctx, 0, 0, W, cardH, CARD_RADIUS);
   ctx.fillStyle = PX.card;
   ctx.fill();
 
   ctx.textBaseline = "alphabetic";
   ctx.textAlign = "left";
 
-  const cx0 = PAGE_PAD + CARD_PAD;
-  let y = PAGE_PAD + CARD_PAD;
+  const cx0 = CARD_PAD;
+  let y = CARD_PAD;
 
   // ---- header: avatar, name, handle / timestamp / views --------------------
   ctx.save();
@@ -575,7 +572,7 @@ export async function renderPostImage(
       const logoH = (LOGO_W * logo.naturalHeight) / logo.naturalWidth;
       ctx.drawImage(
         logo,
-        PAGE_PAD + (W - PAGE_PAD * 2) - CARD_PAD - LOGO_W,
+        W - CARD_PAD - LOGO_W,
         y + (HEADER_H - logoH) / 2,
         LOGO_W,
         logoH
@@ -700,7 +697,11 @@ export async function renderPostImage(
   y += FOOTER_TAIL;
   ctx.fillStyle = PX.muted;
   ctx.font = font(28);
+  ctx.textAlign = "left";
   ctx.fillText(`pickax.com/post/${data.postId}`, cx0, y);
+  ctx.textAlign = "right";
+  ctx.fillText("bit.ly/JoinPickaxToday", cx0 + CONTENT_W, y);
+  ctx.textAlign = "left";
 
   return canvas;
 }

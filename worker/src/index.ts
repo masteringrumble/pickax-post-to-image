@@ -223,6 +223,39 @@ export default {
       });
     }
 
+    if (url.pathname === "/avatar") {
+      const target = (url.searchParams.get("url") ?? "").trim();
+      let parsed: URL;
+      try {
+        parsed = new URL(target);
+      } catch {
+        return jsonResponse({ error: "invalid-url" }, 400);
+      }
+      // Locked down: only proxy Pickax's own image CDN, nothing else.
+      if (parsed.protocol !== "https:" || parsed.hostname !== "img.pickax.com") {
+        return jsonResponse({ error: "invalid-url", hint: "Only https://img.pickax.com URLs are proxied" }, 400);
+      }
+      let res: Response;
+      try {
+        res = await fetch(parsed.toString(), {
+          headers: { "User-Agent": "pickax-post-to-image/1.0" },
+        });
+      } catch {
+        return jsonResponse({ error: "fetch-failed" }, 502);
+      }
+      if (!res.ok) {
+        return jsonResponse({ error: "fetch-failed", hint: `img.pickax.com returned ${res.status}` }, 502);
+      }
+      const contentType = res.headers.get("Content-Type") ?? "image/jpeg";
+      return new Response(res.body, {
+        headers: {
+          "Content-Type": contentType,
+          "Access-Control-Allow-Origin": "*",
+          "Cache-Control": "public, max-age=86400",
+        },
+      });
+    }
+
     if (url.pathname !== "/post") {
       return jsonResponse({ error: "not-found", hint: "Use /post?url=https://pickax.com/post/<id>" }, 404);
     }

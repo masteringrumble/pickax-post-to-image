@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { extractPostId } from "./pickax";
 import {
   fetchPostFromWorker,
+  WORKER_BASE,
   workerConfigured,
   workerErrorMessage,
   type WorkerPostPayload,
@@ -59,6 +60,22 @@ function toLoaded(img: HTMLImageElement): LoadedImage {
   return { img, width: img.naturalWidth, height: img.naturalHeight };
 }
 
+/**
+ * Load a profile picture. img.pickax.com sends no CORS headers, so a direct
+ * cross-origin load fails in the browser; the worker re-serves the same bytes
+ * with `Access-Control-Allow-Origin: *` as a fallback.
+ */
+async function loadAvatar(url: string): Promise<HTMLImageElement> {
+  try {
+    return await loadImageFromUrl(url);
+  } catch {
+    if (!workerConfigured()) throw new Error("image-load");
+    return await loadImageFromUrl(
+      `${WORKER_BASE}/avatar?url=${encodeURIComponent(url.trim())}`
+    );
+  }
+}
+
 /** Turn a worker payload into renderer data, loading remote images. */
 async function postDataFromWorker(
   p: WorkerPostPayload
@@ -67,7 +84,7 @@ async function postDataFromWorker(
   let avatarFailed = false;
   if (p.avatarUrl) {
     try {
-      avatar = await loadImageFromUrl(p.avatarUrl);
+      avatar = await loadAvatar(p.avatarUrl);
     } catch {
       avatarFailed = true;
     }
@@ -223,7 +240,7 @@ export default function App() {
     let avatarFailed = false;
     if (p.avatarUrl) {
       try {
-        avatar = await loadImageFromUrl(p.avatarUrl);
+        avatar = await loadAvatar(p.avatarUrl);
       } catch {
         avatarFailed = true;
       }

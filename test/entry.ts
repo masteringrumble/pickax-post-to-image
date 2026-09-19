@@ -113,7 +113,7 @@ function makeCanvas(w = 10, h = 10): any {
 };
 (globalThis as any).document = { createElement: (_tag: string) => makeCanvas() };
 
-const CONTENT_W = 1200 - 64 * 2;
+const CONTENT_W = 1200 - 52 * 2;
 const measure = (px: number) => (t: string) => Array.from(t).length * px * 0.55;
 
 async function main() {
@@ -179,11 +179,12 @@ async function main() {
       engagement: {},
     });
     assert.equal(canvas.width, 2400, "2x crisp width");
-    assert.ok(canvas.height >= 460 * 2, "min height");
+    assert.ok(canvas.height >= 440 * 2, "min height");
     const texts = canvas._ctx.calls.filter((c: any) => c[0] === "fillText").map((c: any) => c[1]);
     assert.ok(texts.some((t: string) => t.includes("Misfit Electronic")), "display name drawn");
     assert.ok(texts.some((t: string) => t === "@misfit_electronic_gaming"), "handle drawn");
     assert.ok(texts.some((t: string) => t === "pickax.com/post/707864"), "source footer drawn");
+    assert.ok(texts.some((t: string) => t === "bit.ly/JoinPickaxToday"), "join link footer drawn");
     assert.ok(
       canvas._ctx.calls.some((c: any) => c[0] === "drawImage" && c[1] === "logo"),
       "supplied logo drawn"
