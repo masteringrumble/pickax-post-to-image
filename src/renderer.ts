@@ -68,6 +68,9 @@ const W = 1200;
 const SCALE = 2;
 const CARD_PAD = 52; // padding inside the card
 const CONTENT_W = W - CARD_PAD * 2;
+// Text wraps a hair inside the content box: per-word drawing can drift a few
+// px past whole-line measurement (kerning), and this keeps every glyph inside.
+const WRAP_W = CONTENT_W - 8;
 const CARD_RADIUS = 36;
 const AVATAR = 104;
 const LOGO_W = 190;
@@ -421,6 +424,21 @@ export async function renderPostImage(
   opts: RenderOptions = DEFAULT_RENDER_OPTIONS
 ): Promise<HTMLCanvasElement> {
   const o = { ...DEFAULT_RENDER_OPTIONS, ...opts };
+  // Poppins loads async (display=swap). Measuring with the fallback font and
+  // drawing after the webfont arrives wraps lines too wide — they spill past
+  // the card edge. Wait for the exact weights the card uses so measure and
+  // draw always use the same glyphs. If fonts fail, both sides fall back
+  // together and wrapping stays consistent.
+  const doc = typeof document !== "undefined" ? document : undefined;
+  if (doc && "fonts" in doc) {
+    try {
+      await Promise.all(
+        [400, 600, 700].map((w) => doc.fonts.load(`${w} 40px Poppins`))
+      );
+    } catch {
+      /* offline: system fallback, measured consistently */
+    }
+  }
   const measure = document.createElement("canvas").getContext("2d")!;
 
   // Picks/axes are the engagement system; fall back to the legacy "likes"
@@ -439,7 +457,7 @@ export async function renderPostImage(
   // ---- measure text -------------------------------------------------------
   measure.font = font(40);
   const lines = data.text
-    ? wrapText(data.text, CONTENT_W, (t) => measure.measureText(t).width)
+    ? wrapText(data.text, WRAP_W, (t) => measure.measureText(t).width)
     : [];
   const TEXT_LH = 62;
   const textH = lines.length * TEXT_LH;

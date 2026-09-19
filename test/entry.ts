@@ -36,7 +36,12 @@ function makeCtx(): any {
     set lineWidth(_v: number) {},
     set lineCap(_v: string) {},
     set globalAlpha(_v: number) {},
-    set textAlign(_v: string) {},
+    set textAlign(v: string) {
+      this._textAlign = v;
+    },
+    get textAlign() {
+      return this._textAlign || "left";
+    },
     set textBaseline(_v: string) {},
     ellipse() {},
     createLinearGradient() {
@@ -63,8 +68,8 @@ function makeCtx(): any {
     fillRect() {
       calls.push(["fillRect"]);
     },
-    fillText(t: string) {
-      calls.push(["fillText", t]);
+    fillText(t: string, x: number, _y: number) {
+      calls.push(["fillText", t, x, (this as any).textAlign || "left"]);
     },
     drawImage(img: any, ...rest: any[]) {
       calls.push(["drawImage", img === (globalThis as any).__logo ? "logo" : "img", ...rest]);
@@ -253,6 +258,61 @@ async function main() {
     const texts = canvas._ctx.calls.filter((c: any) => c[0] === "fillText").map((c: any) => c[1]);
     assert.ok(texts.join(" ").includes("Lorem ipsum"), "text drawn");
     console.log(`ok  enormous post capped (canvas ${canvas.width}x${canvas.height})`);
+  }
+
+  // ---- 5c. renderer: webfonts awaited before measure/draw ------------------
+  // Regression: Poppins loads async (display=swap); wrapping with the
+  // fallback font and drawing with Poppins spilled long lines past the card.
+  {
+    const doc = (globalThis as any).document;
+    const loaded: string[] = [];
+    doc.fonts = {
+      load: async (spec: string) => {
+        loaded.push(spec);
+        return [];
+      },
+    };
+    await renderPostImage({
+      postId: "1", displayName: "A", username: "a", verified: null,
+      avatar: null, text: "hello", timestamp: "", images: [], engagement: {},
+    });
+    for (const w of [400, 600, 700]) {
+      assert.ok(
+        loaded.some((s) => s.startsWith(`${w} `) && s.includes("Poppins")),
+        `Poppins ${w} awaited before render`
+      );
+    }
+    delete doc.fonts;
+    console.log("ok  webfonts awaited before measure/draw");
+  }
+
+  // ---- 5d. renderer: no drawn text exceeds the card's content box ---------
+  {
+    const tricky =
+      "(Have 49 followers now Need to have an avg of 3 concurrent " +
+      "viewers on 4 different days, Come help me reach Affiliate so I " +
+      "can stream better quality)\n\n#GamingOnRumble #RumbleTakeOver " +
+      "#RumbleStudio #IndieCreators #IndieDevs #SupportIndieDevs";
+    const canvas: any = await renderPostImage({
+      postId: "707864", displayName: "A", username: "a", verified: null,
+      avatar: null, text: tricky, timestamp: "", images: [], engagement: {},
+    });
+    const rightEdge = 52 + (1200 - 52 * 2); // CARD_PAD + CONTENT_W
+    let maxExtent = 0;
+    for (const c of canvas._ctx.calls) {
+      if (c[0] === "fillText") {
+        // stub measure at 40px, the size the post text is drawn at;
+        // right-aligned text (footer link) extends left from x
+        const w = c[1].length * 40 * 0.55;
+        maxExtent = Math.max(maxExtent, c[3] === "right" ? c[2] : c[2] + w);
+      }
+    }
+    assert.ok(maxExtent > 0, "text was drawn");
+    assert.ok(
+      maxExtent <= rightEdge,
+      `every glyph inside the card (max extent ${maxExtent} <= ${rightEdge})`
+    );
+    console.log("ok  all text inside the card's content box");
   }
 
   // ---- 6. renderer: images (1 and 3) + avatar --------------------------------
