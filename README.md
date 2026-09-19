@@ -23,6 +23,24 @@ Paste a Pickax post URL → generate a polished post graphic → download the PN
 Only public information is used. No accounts, no backend, no database,
 no analytics — everything runs in your browser.
 
+## Fast import (no typing)
+
+**One-click bookmarklet:** drag the "📥 Pickax → Image" button from the
+site to your bookmarks bar. While viewing any Pickax post, click it — the
+post opens in the tool with everything filled in. The bookmarklet runs
+inside the page you're already viewing (so it sees your logged-in session
+too), extracts the public post data from the page itself, and hands it to
+the app. No password is stored anywhere and no server is involved.
+
+**Paste the page source:** open the post, press Ctrl+U (Mac:
+Cmd+Option+U), copy everything, paste it into the box on the site, and hit
+"Import from page source".
+
+Both methods pull the display name, @username, profile picture, post text,
+timestamp, attached images, and like/view counts straight from the page.
+Anything the page doesn't provide stays empty and is omitted from the
+image — nothing is ever invented.
+
 ## Run locally
 
 ```bash
