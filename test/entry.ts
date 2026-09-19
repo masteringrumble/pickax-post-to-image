@@ -326,10 +326,15 @@ async function main() {
 <meta property="og:url" content="https://pickax.com/post/707864">
 </head><body>
 <a aria-current="page" href="/post/707864" class="router-link-active router-link-exact-active absolute top-0 left-0 w-full h-full cursor-pointer z-0"></a>
+<a href="/top-users" class="btn btn-primary">Top Users</a>
+<div>
 <a href="/MisfitElectronicGaming" class="cursor-pointer"><img src="https://img.pickax.com/user-8356/ea28e48e-147a-4169-bb97-ba71a823d48f.jpeg" alt="" loading="lazy" decoding="async" class="rounded-full object-cover w-10 h-10 min-w-10"></a>
 <a href="/MisfitElectronicGaming" class="cursor-pointer inline-block overflow-clip">Misfit Electronic Gaming</a>
 <div class="w-5 h-5 icon flex items-center justify-center [&_*]:fill-orange-300"><svg viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg"><g><path fill-rule="evenodd" clip-rule="evenodd" d="M12.7893 4.26666C12.5796 4.45641 12.3593 4.63403 12.1293 4.79866C11.732 5.06533 11.2853 5.24933 10.816 5.34266L13.0627 20.384C13.2661 20.5871 13.5419 20.7011 13.8293 20.7011C14.1168 20.7011 14.3925 20.5871 14.596 20.384L21.832 13.1507H21.8307Z"/></g></svg></div>
+</div>
+<div class="flex flex-wrap gap-x-2 opacity-60">
 <a href="/MisfitElectronicGaming" class="cursor-pointer text-sm inline-block overflow-clip">@MisfitElectronicGaming</a><span title="Sep 19, 2026, 9:11 PM" class="text-sm block font-thin">1 hour ago</span>
+</div>
 <span class="inline-flex items-center gap-1 bg-dark3 px-2 rounded-full text-sm" title="Post views" aria-label="Post views: 6">6</span>
 <button class="font-poppins font-semibold"><svg><defs><linearGradient id="pg"><stop stop-color="#0083f5"/><stop stop-color="#00c4f5"/></linearGradient></defs></svg><div>1</div></button>
 <button class="font-poppins font-semibold"><svg><defs><linearGradient id="ag"><stop stop-color="#dc1919"/><stop stop-color="#f59b00"/></linearGradient></defs></svg></button>

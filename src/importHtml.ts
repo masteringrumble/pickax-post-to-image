@@ -109,27 +109,31 @@ function extractAxes(doc: Document): string {
 }
 
 // Verified badge: the seal SVG (signature path "M12.7893 4.26666") renders in
-// a div right after the author's display name, inside the same header row as
-// the @username link. Scoped to that row so verified commenters elsewhere on
-// the page can't false-positive. Returns the account's real badge color —
-// gold (fill-orange-300 / #FDBA74, "Verified Creator") or blue
-// (fill-blue-*/fill-sky-* / #3EB1F9) — or null when the account has no badge.
-// A seal with no recognizable color defaults to gold.
-function extractVerified(doc: Document): "gold" | "blue" | null {
+// a div right after the author's DISPLAY-NAME link, inside the same header
+// container as that link. The @username link lives in a separate sibling row,
+// so the display-name link (same href as the @username link, but showing the
+// display name) is the anchor — keyed off the author's own handle so nav
+// links and verified commenters elsewhere on the page can't false-positive.
+// Returns the account's real badge color — gold (fill-orange-300 / #FDBA74,
+// "Verified Creator") or blue (fill-blue-*/fill-sky-* / #3EB1F9) — or null
+// when the account has no badge. A seal with no recognizable color defaults
+// to gold.
+function extractVerified(doc: Document, username: string): "gold" | "blue" | null {
+  const handle = username ? `/${username.toLowerCase()}` : "";
   const anchors = Array.from(doc.querySelectorAll('a[href^="/"]'));
-  for (const a of anchors) {
+  const displayNameAnchor = anchors.find((a) => {
     const t = (a.textContent ?? "").trim();
-    if (t.startsWith("@") && t.length > 1) {
-      const row = a.parentElement;
-      const inner = row?.innerHTML ?? "";
-      if (!inner.includes("12.7893 4.26666")) return null;
-      const s = inner.toLowerCase();
-      return s.includes("3eb1f9") || /fill-(blue|sky)-\d{3}/.test(s)
-        ? "blue"
-        : "gold";
-    }
-  }
-  return null;
+    if (!t || t.startsWith("@")) return false;
+    if (handle && (a.getAttribute("href") ?? "").toLowerCase() !== handle)
+      return false;
+    return true;
+  });
+  const inner = displayNameAnchor?.parentElement?.innerHTML ?? "";
+  if (!inner.includes("12.7893 4.26666")) return null;
+  const s = inner.toLowerCase();
+  return s.includes("3eb1f9") || /fill-(blue|sky)-\d{3}/.test(s)
+    ? "blue"
+    : "gold";
 }
 
 function extractTimestamp(doc: Document): string {
@@ -201,7 +205,7 @@ export function parsePostHtml(html: string): ParsedImport {
     postId,
     displayName,
     username,
-    verified: extractVerified(doc),
+    verified: extractVerified(doc, username),
     avatarUrl,
     text,
     timestamp: extractTimestamp(doc),
@@ -310,10 +314,15 @@ export const BOOKMARKLET: string =
   "var t=(a.textContent||'').trim();" +
   "if(t.charAt(0)==='@'&&t.length>1){" +
   "if(!o.username)o.username=t.slice(1).trim();" +
-  "var pe=a.parentElement;" +
+  // The seal sits beside the DISPLAY-NAME link (same href, non-@ text) in the
+  // header container; the @username link is in a separate row.
+  "if(!o.verified){var dn=null;" +
+  "Array.prototype.forEach.call(d.querySelectorAll('a[href=\"'+a.getAttribute('href')+'\"]'),function(x){" +
+  "var xt=(x.textContent||'').trim();if(xt&&xt.charAt(0)!=='@'&&!dn)dn=x;});" +
+  "var pe=dn?dn.parentElement:null;" +
   "if(pe&&pe.innerHTML.indexOf('12.7893 4.26666')>-1){" +
   "var ph=pe.innerHTML.toLowerCase();" +
-  "o.verified=(ph.indexOf('3eb1f9')>-1||/fill-(blue|sky)-\\\\d{3}/.test(ph))?'blue':'gold';}" +
+  "o.verified=(ph.indexOf('3eb1f9')>-1||/fill-(blue|sky)-\\\\d{3}/.test(ph))?'blue':'gold';}}" +
   "var s=a.nextElementSibling;" +
   "if(s&&s.tagName==='SPAN'&&s.getAttribute('title')&&!o.timestamp)o.timestamp=(s.textContent||'').trim();}});" +
   "var av=q('img.rounded-full[src*=\"img.pickax.com\"]');" +
