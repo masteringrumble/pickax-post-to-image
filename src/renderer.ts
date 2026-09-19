@@ -18,7 +18,7 @@ const PX = {
   divider: "#394050",
   white: "#FFFFFF",
   muted: "#BDC5DB", // @username, timestamp
-  blue: "#3EB1F9", // @mentions, #hashtags
+  blue: "#3EB1F9", // @mentions (pickax.com link blue; hashtags are body-white)
   videoBg: "#0B101E",
   avatarBg: "#333D52",
   avatarInitial: "#BDC5DB",
@@ -80,9 +80,15 @@ const BTN_H = 76;
 const BTN_GAP = 18;
 
 const FONT_STACK = `"Poppins", "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif`;
+// Post body text renders in Mulish on pickax.com; the card chrome stays Poppins.
+const BODY_FONT_STACK = `"Mulish", "Poppins", "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif`;
 
 function font(px: number, weight: number = 400): string {
   return `${weight} ${px}px ${FONT_STACK}`;
+}
+
+function bodyFont(px: number, weight: number = 400): string {
+  return `${weight} ${px}px ${BODY_FONT_STACK}`;
 }
 
 function roundRectPath(
@@ -393,7 +399,8 @@ function drawEngagementButton(
   }
 }
 
-/** Post body: white text, @mentions and #hashtags in Pickax blue. */
+/** Post body: white text, @mentions in Pickax blue (hashtags stay body-white,
+ * exactly like pickax.com, where only @mentions are links). */
 function drawRichLine(
   ctx: CanvasRenderingContext2D,
   line: string,
@@ -404,7 +411,7 @@ function drawRichLine(
   const spaceW = ctx.measureText(" ").width;
   let cx = x;
   for (const word of words) {
-    ctx.fillStyle = /^[@#]/.test(word) ? PX.blue : PX.white;
+    ctx.fillStyle = word.startsWith("@") ? PX.blue : PX.white;
     ctx.fillText(word, cx, y);
     cx += ctx.measureText(word).width + spaceW;
   }
@@ -432,9 +439,10 @@ export async function renderPostImage(
   const doc = typeof document !== "undefined" ? document : undefined;
   if (doc && "fonts" in doc) {
     try {
-      await Promise.all(
-        [400, 600, 700].map((w) => doc.fonts.load(`${w} 40px Poppins`))
-      );
+      await Promise.all([
+        ...[400, 600, 700].map((w) => doc.fonts.load(`${w} 40px Poppins`)),
+        doc.fonts.load("400 40px Mulish"), // post body text
+      ]);
     } catch {
       /* offline: system fallback, measured consistently */
     }
@@ -455,7 +463,7 @@ export async function renderPostImage(
   const timestamp = data.timestamp.trim();
 
   // ---- measure text -------------------------------------------------------
-  measure.font = font(40);
+  measure.font = bodyFont(40);
   // Width must be computed EXACTLY the way drawRichLine advances: it draws
   // word by word, so whole-string measurement (which applies cross-word
   // kerning) disagrees with the drawn width and long lines spill past the
@@ -473,7 +481,11 @@ export async function renderPostImage(
   };
   const lines = data.text ? wrapText(data.text, WRAP_W, textWidth) : [];
   const TEXT_LH = 62;
-  const textH = lines.length * TEXT_LH;
+  // pickax.com separates paragraphs with margin-bottom:1.25rem = 20px at
+  // 15px body text = 1.333x the font size -> 54px at our 40px body size.
+  const PARA_GAP = 54;
+  const blankCount = lines.filter((l) => l === "").length;
+  const textH = (lines.length - blankCount) * TEXT_LH + blankCount * PARA_GAP;
 
   const rows = o.showMedia ? layoutImages(data.images) : [];
   const imagesH =
@@ -622,12 +634,19 @@ export async function renderPostImage(
   // ---- post text ----------------------------------------------------------
   if (lines.length > 0) {
     y += GAP_SECTION;
-    ctx.font = font(40);
+    ctx.font = bodyFont(40);
+    let lastAdvance = 0;
     for (const line of lines) {
-      if (line !== "") drawRichLine(ctx, line, cx0, y);
-      y += TEXT_LH;
+      if (line === "") {
+        y += PARA_GAP; // paragraph break, like pickax.com's <p> margin
+        lastAdvance = PARA_GAP;
+      } else {
+        drawRichLine(ctx, line, cx0, y);
+        y += TEXT_LH;
+        lastAdvance = TEXT_LH;
+      }
     }
-    y -= TEXT_LH; // back up: the loop advanced past the last line
+    y -= lastAdvance; // back up: the loop advanced past the last line
   }
 
   // ---- attached images ----------------------------------------------------

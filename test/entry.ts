@@ -31,7 +31,9 @@ function makeCtx(): any {
     get font() {
       return this._font;
     },
-    set fillStyle(_v: string) {},
+    set fillStyle(v: string) {
+      this._fillStyle = v;
+    },
     set strokeStyle(_v: string) {},
     set lineWidth(_v: number) {},
     set lineCap(_v: string) {},
@@ -79,7 +81,13 @@ function makeCtx(): any {
       calls.push(["fillRect"]);
     },
     fillText(t: string, x: number, _y: number) {
-      calls.push(["fillText", t, x, (this as any).textAlign || "left"]);
+      calls.push([
+        "fillText",
+        t,
+        x,
+        (this as any).textAlign || "left",
+        (this as any)._fillStyle || "",
+      ]);
     },
     drawImage(img: any, ...rest: any[]) {
       calls.push(["drawImage", img === (globalThis as any).__logo ? "logo" : "img", ...rest]);
@@ -292,6 +300,10 @@ async function main() {
         `Poppins ${w} awaited before render`
       );
     }
+    assert.ok(
+      loaded.some((s) => s.includes("Mulish")),
+      "Mulish (post body text) awaited before render"
+    );
     delete doc.fonts;
     console.log("ok  webfonts awaited before measure/draw");
   }
@@ -323,6 +335,22 @@ async function main() {
       `every glyph inside the card (max extent ${maxExtent} <= ${rightEdge})`
     );
     console.log("ok  all text inside the card's content box");
+  }
+
+  // ---- 5e. renderer: @mentions blue, #hashtags body-white (like pickax) ---
+  {
+    const canvas: any = await renderPostImage({
+      postId: "1", displayName: "A", username: "a", verified: null,
+      avatar: null, text: "hi @gamingonrumble #RumbleTakeover bye",
+      timestamp: "", images: [], engagement: {},
+    });
+    const fills = canvas._ctx.calls.filter((c: any) => c[0] === "fillText");
+    const colorOf = (word: string) =>
+      (fills.find((c: any) => c[1] === word) || [])[4];
+    assert.equal(colorOf("@gamingonrumble"), "#3EB1F9", "@mention is Pickax blue");
+    assert.equal(colorOf("#RumbleTakeover"), "#FFFFFF", "#hashtag is body-white");
+    assert.equal(colorOf("hi"), "#FFFFFF", "plain word is body-white");
+    console.log("ok  @mentions blue, #hashtags body-white");
   }
 
   // ---- 6. renderer: images (1 and 3) + avatar --------------------------------
