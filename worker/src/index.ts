@@ -223,7 +223,7 @@ export default {
       });
     }
 
-    if (url.pathname === "/avatar") {
+    if (url.pathname === "/img") {
       const target = (url.searchParams.get("url") ?? "").trim();
       let parsed: URL;
       try {
@@ -231,9 +231,16 @@ export default {
       } catch {
         return jsonResponse({ error: "invalid-url" }, 400);
       }
-      // Locked down: only proxy Pickax's own image CDN, nothing else.
-      if (parsed.protocol !== "https:" || parsed.hostname !== "img.pickax.com") {
-        return jsonResponse({ error: "invalid-url", hint: "Only https://img.pickax.com URLs are proxied" }, 400);
+      // Locked down: only proxy Pickax's image CDN and Rumble's thumbnail
+      // CDN (post attachments + video posters), nothing else.
+      const host = parsed.hostname;
+      const allowed =
+        host === "img.pickax.com" || host.endsWith(".cdn.rumble.cloud");
+      if (parsed.protocol !== "https:" || !allowed) {
+        return jsonResponse(
+          { error: "invalid-url", hint: "Only Pickax/Rumble image CDN URLs are proxied" },
+          400
+        );
       }
       let res: Response;
       try {

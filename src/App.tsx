@@ -61,17 +61,18 @@ function toLoaded(img: HTMLImageElement): LoadedImage {
 }
 
 /**
- * Load a profile picture. img.pickax.com sends no CORS headers, so a direct
- * cross-origin load fails in the browser; the worker re-serves the same bytes
- * with `Access-Control-Allow-Origin: *` as a fallback.
+ * Load a remote post image (profile picture, attached photo, video poster).
+ * These CDNs send no CORS headers, so a direct cross-origin load fails in
+ * the browser; the worker re-serves the same bytes with
+ * `Access-Control-Allow-Origin: *` as a fallback.
  */
-async function loadAvatar(url: string): Promise<HTMLImageElement> {
+async function loadCdnImage(url: string): Promise<HTMLImageElement> {
   try {
     return await loadImageFromUrl(url);
   } catch {
     if (!workerConfigured()) throw new Error("image-load");
     return await loadImageFromUrl(
-      `${WORKER_BASE}/avatar?url=${encodeURIComponent(url.trim())}`
+      `${WORKER_BASE}/img?url=${encodeURIComponent(url.trim())}`
     );
   }
 }
@@ -84,7 +85,7 @@ async function postDataFromWorker(
   let avatarFailed = false;
   if (p.avatarUrl) {
     try {
-      avatar = await loadAvatar(p.avatarUrl);
+      avatar = await loadCdnImage(p.avatarUrl);
     } catch {
       avatarFailed = true;
     }
@@ -94,7 +95,7 @@ async function postDataFromWorker(
   let imageFailed = false;
   for (const u of (p.images ?? []).slice(0, MAX_POST_IMAGES)) {
     try {
-      images.push(toLoaded(await loadImageFromUrl(u)));
+      images.push(toLoaded(await loadCdnImage(u)));
     } catch {
       imageFailed = true;
     }
@@ -109,7 +110,7 @@ async function postDataFromWorker(
   let videoThumb: LoadedImage | null = null;
   if (p.video?.thumbnail) {
     try {
-      videoThumb = toLoaded(await loadImageFromUrl(p.video.thumbnail));
+      videoThumb = toLoaded(await loadCdnImage(p.video.thumbnail));
     } catch {
       /* fall back to the placeholder player */
     }
@@ -240,7 +241,7 @@ export default function App() {
     let avatarFailed = false;
     if (p.avatarUrl) {
       try {
-        avatar = await loadAvatar(p.avatarUrl);
+        avatar = await loadCdnImage(p.avatarUrl);
       } catch {
         avatarFailed = true;
       }
@@ -250,7 +251,7 @@ export default function App() {
     let imageFailed = false;
     for (const u of p.imageUrls.slice(0, MAX_POST_IMAGES)) {
       try {
-        images.push(toLoaded(await loadImageFromUrl(u)));
+        images.push(toLoaded(await loadCdnImage(u)));
       } catch {
         imageFailed = true;
       }
@@ -270,7 +271,7 @@ export default function App() {
     let videoThumb: LoadedImage | null = null;
     if (p.videoThumbnailUrl) {
       try {
-        videoThumb = toLoaded(await loadImageFromUrl(p.videoThumbnailUrl));
+        videoThumb = toLoaded(await loadCdnImage(p.videoThumbnailUrl));
       } catch {
         /* fall back to the placeholder player */
       }
@@ -370,7 +371,7 @@ export default function App() {
         }
       } else if (avatarUrl.trim()) {
         try {
-          avatar = await loadImageFromUrl(avatarUrl.trim());
+          avatar = await loadCdnImage(avatarUrl.trim());
         } catch {
           setNotice(
             (n) => n + (n ? " " : "") + "The avatar image couldn't be loaded, so a placeholder is used instead."
@@ -389,7 +390,7 @@ export default function App() {
       }
       for (const u of imageUrlList.slice(0, MAX_POST_IMAGES - images.length)) {
         try {
-          images.push(toLoaded(await loadImageFromUrl(u)));
+          images.push(toLoaded(await loadCdnImage(u)));
         } catch {
           imageFailed = true;
         }
