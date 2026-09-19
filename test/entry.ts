@@ -11,6 +11,7 @@ import { extractPostId } from "../src/pickax";
 import {
   BOOKMARKLET,
   cleanDescription,
+  extractVideoThumbnailUrl,
   parseImportHash,
   parsePostHtml,
   prettyTimestamp,
@@ -373,6 +374,19 @@ async function main() {
     }
     assert.ok(threw, "non-post HTML rejected");
     console.log("ok  parsePostHtml (all fields extracted, junk rejected)");
+
+    // Video thumbnail: the poster's image from page state, as the player shows it.
+    {
+      const html = `<html><body><iframe src="https://rumble.com/embed/v7djhge/"></iframe>` +
+        `{"thumbnail_url":28} "https://hugh.cdn.rumble.cloud/video/fwe2/df/s8/1/u/e/v/Z/uevZA.qR4e-small-LIVE.jpg"` +
+        `</body></html>`;
+      assert.strictEqual(
+        extractVideoThumbnailUrl(html),
+        "https://hugh.cdn.rumble.cloud/video/fwe2/df/s8/1/u/e/v/Z/uevZA.qR4e-small-LIVE.jpg"
+      );
+      assert.strictEqual(extractVideoThumbnailUrl("<html><body>no video</body></html>"), "");
+      console.log("ok  video thumbnail extraction");
+    }
 
     // The real bookmarklet code, executed against the fixture DOM.
     const dom = new JSDOM(FIXTURE_HTML, {

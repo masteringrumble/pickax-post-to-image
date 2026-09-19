@@ -17,6 +17,8 @@ export interface ParsedImport {
   imageUrls: string[];
   videoSrc: string;
   videoTitle: string;
+  /** Poster thumbnail for the video embed (what the player shows pre-play). */
+  videoThumbnailUrl: string;
   /** Pickax "pick" (like) count. */
   picks: string;
   /** Pickax "axe" (dislike) count. */
@@ -138,12 +140,28 @@ function extractTimestamp(doc: Document): string {
   return tm?.getAttribute("datetime")?.trim() ?? "";
 }
 
-function extractVideo(doc: Document): { src: string; title: string } {
+function extractVideo(doc: Document, html: string): { src: string; title: string; thumbnailUrl: string } {
   const f = doc.querySelector('iframe[src*="rumble.com/embed"]');
   return {
     src: f?.getAttribute("src")?.trim() ?? "",
     title: f?.getAttribute("title")?.trim() ?? "",
+    thumbnailUrl: extractVideoThumbnailUrl(html),
   };
+}
+
+/**
+ * The video poster's thumbnail — what the embedded player shows before play.
+ * Rumble's oEmbed thumbnail (served from their CDN) is embedded in the page
+ * state of a pasted page source.
+ */
+export function extractVideoThumbnailUrl(html: string): string {
+  const rumbleM = html.match(
+    /https:\/\/[a-z0-9.-]+\.cdn\.rumble\.cloud\/[^"\\\s'<>]+\.(?:jpg|jpeg|png|webp)/i
+  );
+  if (rumbleM) return rumbleM[0];
+  const genericM = html.match(/"thumbnail_url"\s*:\s*"([^"]+)"/);
+  if (genericM) return genericM[1].replace(/\\\//g, "/");
+  return "";
 }
 
 export class ImportParseError extends Error {}
@@ -169,7 +187,7 @@ export function parsePostHtml(html: string): ParsedImport {
   const idMatch = ogUrl.match(/\/post\/(\d+)/);
   if (idMatch) postId = idMatch[1];
 
-  const video = extractVideo(doc);
+  const video = extractVideo(doc, html);
 
   return {
     postId,
@@ -182,6 +200,7 @@ export function parsePostHtml(html: string): ParsedImport {
     imageUrls: extractImageUrls(doc, avatarUrl),
     videoSrc: video.src,
     videoTitle: video.title,
+    videoThumbnailUrl: video.thumbnailUrl,
     picks: extractPicks(doc),
     axes: extractAxes(doc),
     views: extractViews(doc),
@@ -229,6 +248,7 @@ function coerceImport(raw: unknown): ParsedImport | null {
     imageUrls,
     videoSrc: str(o.videoSrc),
     videoTitle: str(o.videoTitle),
+    videoThumbnailUrl: str(o.videoThumb),
     // v1 bookmarklets sent `likes`; treat it as the pick count.
     picks: str(o.picks) || str(o.likes),
     axes: str(o.axes),
@@ -270,7 +290,7 @@ export const BOOKMARKLET: string =
   "meta=function(p){var e=q('meta[property=\"'+p+'\"]');return e?e.getAttribute('content')||'':''}," +
   "o={v:2,postId:'',displayName:(meta('og:title')||'').replace(/\\s+posted\\s*$/i,'')," +
   "text:(meta('og:description')||'').replace(/\\s*user=\\S+\\s+[\\d,]+\\s+Followers\\s*$/i,'')," +
-  "username:'',verified:!1,avatar:'',timestamp:'',picks:'',axes:'',views:'',videoSrc:'',videoTitle:'',images:[]};" +
+  "username:'',verified:!1,avatar:'',timestamp:'',picks:'',axes:'',views:'',videoSrc:'',videoTitle:'',videoThumb:'',images:[]};" +
   "Array.prototype.forEach.call(d.querySelectorAll('a[href^=\"/\"]'),function(a){" +
   "var t=(a.textContent||'').trim();" +
   "if(t.charAt(0)==='@'&&t.length>1){" +
@@ -289,6 +309,8 @@ export const BOOKMARKLET: string =
   "if(h.indexOf('dc1919')>-1&&!o.axes)o.axes=m?m[1]:'0';});" +
   "var fr=q('iframe[src*=\"rumble.com/embed\"]');" +
   "if(fr){o.videoSrc=fr.src||'';o.videoTitle=fr.getAttribute('title')||'';}" +
+  "var thm=d.documentElement.innerHTML.match(/https:\\/\\/[a-z0-9.-]+\\.cdn\\.rumble\\.cloud\\/[^\"\\\\\\s'<>]+\\.(?:jpg|jpeg|png|webp)/i);" +
+  "if(thm)o.videoThumb=thm[0];" +
   "o.images=Array.prototype.filter.call(d.querySelectorAll('img[src*=\"img.pickax.com\"]')," +
   "function(i){return i!==av;}).map(function(i){return i.src;}).slice(0,4);" +
   "var pm=location.pathname.match(/\\/post\\/(\\d+)/);if(pm)o.postId=pm[1];" +

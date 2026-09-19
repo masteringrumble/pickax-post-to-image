@@ -24,6 +24,8 @@ export interface PostVideo {
   src: string;
   /** Video title, shown on the placeholder. */
   title: string;
+  /** Poster thumbnail, drawn like the video looks on the actual post. */
+  thumbnail: LoadedImage | null;
 }
 
 // Everything the renderer needs. Every field is either retrieved from the

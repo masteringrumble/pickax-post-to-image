@@ -50,7 +50,7 @@ export interface PostPayload {
   /** Author's Pickax verified badge (seal next to the display name). */
   verified: boolean;
   images: string[];
-  video: { src: string; title: string } | null;
+  video: { src: string; title: string; thumbnail: string | null } | null;
   fetchedAt: string;
 }
 
@@ -78,14 +78,33 @@ function extractEngagement(html: string): { picks: string | null; axes: string |
 }
 
 /** Video embeds (e.g. Rumble) render as iframes; capture src + title. */
-function extractVideo(html: string): { src: string; title: string } | null {
+function extractVideo(html: string): { src: string; title: string; thumbnail: string | null } | null {
   const tagM = html.match(/<iframe([^>]*)>/i);
   if (!tagM) return null;
   const attrs = tagM[1];
   const srcM = attrs.match(/src=["']([^"']+)["']/i);
   const titleM = attrs.match(/title=["']([^"']*)["']/i);
   if (!srcM || !/rumble\.com\/embed\//i.test(srcM[1])) return null;
-  return { src: srcM[1], title: titleM ? decodeEntities(titleM[1]) : "" };
+  return {
+    src: srcM[1],
+    title: titleM ? decodeEntities(titleM[1]) : "",
+    thumbnail: extractVideoThumbnail(html),
+  };
+}
+
+/**
+ * The video poster's thumbnail — what the embedded player shows before play,
+ * i.e. what you see when viewing the actual post. Rumble's oEmbed thumbnail
+ * (served from their CDN) is embedded in the page state.
+ */
+function extractVideoThumbnail(html: string): string | null {
+  const rumbleM = html.match(
+    /https:\/\/[a-z0-9.-]+\.cdn\.rumble\.cloud\/[^"\\\s'<>]+\.(?:jpg|jpeg|png|webp)/i
+  );
+  if (rumbleM) return rumbleM[0];
+  const genericM = html.match(/"thumbnail_url"\s*:\s*"([^"]+)"/);
+  if (genericM) return genericM[1].replace(/\\\//g, "/");
+  return null;
 }
 
 export function extract(html: string, postId: string, postUrl: string): PostPayload | null {

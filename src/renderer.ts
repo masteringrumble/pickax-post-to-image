@@ -327,8 +327,12 @@ function drawViewsPill(
 ): number {
   const iconS = 26;
   ctx.font = font(30, 600);
-  const textW = ctx.measureText(views).width;
   const padX = 18;
+  // The timestamp row reserves 200px for this pill; never exceed it so the
+  // pill can never spill past the card edge, no matter the input.
+  const maxTextW = Math.max(0, 200 - padX - iconS - 12 - padX);
+  const shown = truncate(ctx, views, maxTextW);
+  const textW = ctx.measureText(shown).width;
   const pillW = padX + iconS + 12 + textW + padX;
   const pillH = 52;
   const top = centerY - pillH / 2;
@@ -338,7 +342,7 @@ function drawViewsPill(
   drawEye(ctx, x + padX + iconS / 2, centerY, iconS);
   ctx.fillStyle = PX.white;
   ctx.textBaseline = "middle";
-  ctx.fillText(views, x + padX + iconS + 12, centerY + 1);
+  ctx.fillText(shown, x + padX + iconS + 12, centerY + 1);
   ctx.textBaseline = "alphabetic";
   return pillW;
 }
@@ -361,16 +365,18 @@ function drawEngagementButton(
     const iconS = 38;
     ctx.font = font(32, 600);
     const label = count.trim();
-    const labelW = label ? ctx.measureText(label).width : 0;
-    const gapI = label ? 14 : 0;
+    // The count must never spill outside its button.
+    const shown = label ? truncate(ctx, label, Math.max(0, w - iconS - 14 - 32)) : "";
+    const labelW = shown ? ctx.measureText(shown).width : 0;
+    const gapI = shown ? 14 : 0;
     const totalW = iconS + gapI + labelW;
     const ix = x + (w - totalW) / 2;
     drawPickAxeIcon(ctx, kind, ix + iconS / 2, cy, iconS);
-    if (label) {
+    if (shown) {
       ctx.fillStyle = PX.white;
       ctx.textBaseline = "middle";
       ctx.textAlign = "left";
-      ctx.fillText(label, ix + iconS + gapI, cy + 1);
+      ctx.fillText(shown, ix + iconS + gapI, cy + 1);
       ctx.textBaseline = "alphabetic";
     }
   } else if (kind === "comments") {
@@ -613,16 +619,32 @@ export async function renderPostImage(
     y -= gap;
   }
 
-  // ---- video embed placeholder (16:9, play button, title) ------------------
+  // ---- video embed: thumbnail as shown on the actual post, with a play -----
+  // ---- button overlay; dark placeholder only when no thumbnail loaded ----
   if (videoH > 0 && video) {
     y += GAP_SECTION;
     roundRectPath(ctx, cx0, y, CONTENT_W, videoH, 24);
     ctx.fillStyle = PX.videoBg;
     ctx.fill();
+    const thumb = video.thumbnail;
+    if (thumb) {
+      // Cover-fit the 16:9 box, clipped to the rounded corners.
+      const scale = Math.max(CONTENT_W / thumb.width, videoH / thumb.height);
+      const dw = thumb.width * scale;
+      const dh = thumb.height * scale;
+      ctx.save();
+      roundRectPath(ctx, cx0, y, CONTENT_W, videoH, 24);
+      ctx.clip();
+      ctx.drawImage(thumb.img, cx0 + (CONTENT_W - dw) / 2, y + (videoH - dh) / 2, dw, dh);
+      // Dim slightly so the play button reads, like the real player.
+      ctx.fillStyle = "rgba(0,0,0,0.25)";
+      ctx.fillRect(cx0, y, CONTENT_W, videoH);
+      ctx.restore();
+    }
     const pcx = cx0 + CONTENT_W / 2;
-    const pcy = y + videoH / 2 - (video.title ? 26 : 0);
+    const pcy = y + videoH / 2 - (video.title && !thumb ? 26 : 0);
     drawPlayButton(ctx, pcx, pcy, 58);
-    if (video.title) {
+    if (video.title && !thumb) {
       ctx.fillStyle = PX.muted;
       ctx.font = font(30);
       ctx.textAlign = "center";

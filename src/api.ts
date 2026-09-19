@@ -8,6 +8,7 @@ export const WORKER_BASE = "https://pickax-post-api.masteringrumble.workers.dev"
 export interface WorkerPostVideo {
   src: string;
   title: string;
+  thumbnail: string | null;
 }
 
 export interface WorkerPostPayload {

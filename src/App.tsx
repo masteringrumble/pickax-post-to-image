@@ -88,6 +88,15 @@ async function postDataFromWorker(
   if (imageFailed)
     notice += " An attached image couldn't be loaded, so it was left out.";
 
+  let videoThumb: LoadedImage | null = null;
+  if (p.video?.thumbnail) {
+    try {
+      videoThumb = toLoaded(await loadImageFromUrl(p.video.thumbnail));
+    } catch {
+      /* fall back to the placeholder player */
+    }
+  }
+
   const data: PostData = {
     postId: p.postId,
     displayName: p.displayName ?? "",
@@ -102,7 +111,9 @@ async function postDataFromWorker(
       axes: p.axes ?? undefined,
       views: p.views ?? undefined,
     },
-    video: p.video ? { src: p.video.src, title: p.video.title } : null,
+    video: p.video
+      ? { src: p.video.src, title: p.video.title, thumbnail: videoThumb }
+      : null,
   };
   return { data, notice };
 }
@@ -125,6 +136,7 @@ export default function App() {
   const [views, setViews] = useState("");
   const [verified, setVerified] = useState(false);
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
+  const [avatarUrl, setAvatarUrl] = useState("");
   const [imageFiles, setImageFiles] = useState<File[]>([]);
   const [imageUrl, setImageUrl] = useState("");
   const [imageUrlList, setImageUrlList] = useState<string[]>([]);
@@ -235,6 +247,15 @@ export default function App() {
       notice += " The post was imported, but an attached image couldn't be loaded.";
     setNotice(notice);
 
+    let videoThumb: LoadedImage | null = null;
+    if (p.videoThumbnailUrl) {
+      try {
+        videoThumb = toLoaded(await loadImageFromUrl(p.videoThumbnailUrl));
+      } catch {
+        /* fall back to the placeholder player */
+      }
+    }
+
     const data: PostData = {
       postId: p.postId,
       displayName: p.displayName,
@@ -251,7 +272,7 @@ export default function App() {
       },
       video:
         p.videoSrc || p.videoTitle
-          ? { src: p.videoSrc, title: p.videoTitle }
+          ? { src: p.videoSrc, title: p.videoTitle, thumbnail: videoThumb }
           : null,
     };
     try {
@@ -322,6 +343,14 @@ export default function App() {
       if (avatarFile) {
         try {
           avatar = await loadImageFromFile(avatarFile);
+        } catch {
+          setNotice(
+            (n) => n + (n ? " " : "") + "The avatar image couldn't be loaded, so a placeholder is used instead."
+          );
+        }
+      } else if (avatarUrl.trim()) {
+        try {
+          avatar = await loadImageFromUrl(avatarUrl.trim());
         } catch {
           setNotice(
             (n) => n + (n ? " " : "") + "The avatar image couldn't be loaded, so a placeholder is used instead."
@@ -613,6 +642,15 @@ export default function App() {
               accept="image/*"
               onChange={(e) => setAvatarFile(e.target.files?.[0] ?? null)}
             />
+            <div className="url-row">
+              <input
+                className="text-input"
+                type="url"
+                placeholder="…or paste a profile picture URL"
+                value={avatarUrl}
+                onChange={(e) => setAvatarUrl(e.target.value)}
+              />
+            </div>
 
             <label className="field-label" htmlFor="post-images">
               Post images <span className="optional">(optional, up to {MAX_POST_IMAGES})</span>
