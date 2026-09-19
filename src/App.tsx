@@ -1,5 +1,11 @@
 import { useEffect, useRef, useState } from "react";
-import { extractPostId, tryAutoImport, AutoImportError } from "./pickax";
+import { extractPostId } from "./pickax";
+import {
+  fetchPostFromWorker,
+  workerConfigured,
+  workerErrorMessage,
+  type WorkerPostPayload,
+} from "./api";
 import {
   BOOKMARKLET,
   clearImportHash,
@@ -10,7 +16,12 @@ import {
   type ParsedImport,
 } from "./importHtml";
 import { renderPostImage } from "./renderer";
-import type { LoadedImage, PostData } from "./types";
+import {
+  DEFAULT_RENDER_OPTIONS,
+  type LoadedImage,
+  type PostData,
+  type RenderOptions,
+} from "./types";
 import "./styles.css";
 
 type Stage = "url" | "loading" | "manual" | "preview";
@@ -47,6 +58,54 @@ function toLoaded(img: HTMLImageElement): LoadedImage {
   return { img, width: img.naturalWidth, height: img.naturalHeight };
 }
 
+/** Turn a worker payload into renderer data, loading remote images. */
+async function postDataFromWorker(
+  p: WorkerPostPayload
+): Promise<{ data: PostData; notice: string }> {
+  let avatar: HTMLImageElement | null = null;
+  let avatarFailed = false;
+  if (p.avatarUrl) {
+    try {
+      avatar = await loadImageFromUrl(p.avatarUrl);
+    } catch {
+      avatarFailed = true;
+    }
+  }
+
+  const images: LoadedImage[] = [];
+  let imageFailed = false;
+  for (const u of (p.images ?? []).slice(0, MAX_POST_IMAGES)) {
+    try {
+      images.push(toLoaded(await loadImageFromUrl(u)));
+    } catch {
+      imageFailed = true;
+    }
+  }
+
+  let notice = "Imported straight from the Pickax post. Give it a quick look before downloading.";
+  if (avatarFailed)
+    notice += " The profile picture couldn't be loaded, so a placeholder is used instead.";
+  if (imageFailed)
+    notice += " An attached image couldn't be loaded, so it was left out.";
+
+  const data: PostData = {
+    postId: p.postId,
+    displayName: p.displayName ?? "",
+    username: (p.username ?? "").replace(/^@+/, ""),
+    avatar,
+    text: (p.text ?? "").replace(/\r\n/g, "\n"),
+    timestamp: p.timeAgo || p.timestamp || "",
+    images,
+    engagement: {
+      picks: p.picks ?? undefined,
+      axes: p.axes ?? undefined,
+      views: p.views ?? undefined,
+    },
+    video: p.video ? { src: p.video.src, title: p.video.title } : null,
+  };
+  return { data, notice };
+}
+
 export default function App() {
   const [stage, setStage] = useState<Stage>("url");
   const [url, setUrl] = useState("");
@@ -60,9 +119,8 @@ export default function App() {
   const [username, setUsername] = useState("");
   const [text, setText] = useState("");
   const [timestamp, setTimestamp] = useState("");
-  const [likes, setLikes] = useState("");
-  const [comments, setComments] = useState("");
-  const [reposts, setReposts] = useState("");
+  const [picks, setPicks] = useState("");
+  const [axes, setAxes] = useState("");
   const [views, setViews] = useState("");
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
   const [imageFiles, setImageFiles] = useState<File[]>([]);
@@ -70,8 +128,10 @@ export default function App() {
   const [imageUrlList, setImageUrlList] = useState<string[]>([]);
 
   const [previewUrl, setPreviewUrl] = useState("");
+  const [options, setOptions] = useState<RenderOptions>(DEFAULT_RENDER_OPTIONS);
   const [htmlSource, setHtmlSource] = useState("");
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const dataRef = useRef<PostData | null>(null);
 
   // One-click import: the bookmarklet opens the app with #import=<data>.
   useEffect(() => {
@@ -93,17 +153,43 @@ export default function App() {
     setUsername("");
     setText("");
     setTimestamp("");
-    setLikes("");
-    setComments("");
-    setReposts("");
+    setPicks("");
+    setAxes("");
     setViews("");
     setAvatarFile(null);
     setImageFiles([]);
     setImageUrl("");
     setImageUrlList([]);
     setPreviewUrl("");
+    setOptions(DEFAULT_RENDER_OPTIONS);
     setHtmlSource("");
     canvasRef.current = null;
+    dataRef.current = null;
+  }
+
+  async function renderAndPreview(
+    data: PostData,
+    opts: RenderOptions = DEFAULT_RENDER_OPTIONS
+  ) {
+    dataRef.current = data;
+    setOptions(opts);
+    const canvas = await renderPostImage(data, opts);
+    canvasRef.current = canvas;
+    setPreviewUrl(canvas.toDataURL("image/png"));
+    setStage("preview");
+  }
+
+  async function handleToggleChange(next: RenderOptions) {
+    setOptions(next);
+    const data = dataRef.current;
+    if (!data) return;
+    try {
+      const canvas = await renderPostImage(data, next);
+      canvasRef.current = canvas;
+      setPreviewUrl(canvas.toDataURL("image/png"));
+    } catch {
+      // Keep the last good preview if a re-render fails.
+    }
   }
 
   // Build the image from data extracted from the post page (bookmarklet or
@@ -155,9 +241,14 @@ export default function App() {
       timestamp: prettyTimestamp(p.timestamp),
       images,
       engagement: {
-        likes: p.likes || undefined,
+        picks: p.picks || undefined,
+        axes: p.axes || undefined,
         views: p.views || undefined,
       },
+      video:
+        p.videoSrc || p.videoTitle
+          ? { src: p.videoSrc, title: p.videoTitle }
+          : null,
     };
     try {
       await renderAndPreview(data);
@@ -185,55 +276,32 @@ export default function App() {
     }
   }
 
+  // Primary flow: paste a post URL, the import service reads the public post
+  // page, and the image is built from what Pickax actually shows. No typing.
   async function handleGenerateFromUrl() {
     setError("");
     setNotice("");
     const id = extractPostId(url);
     if (!id) {
-      setError("Please enter a valid Pickax post URL.");
+      setError("Please enter a valid Pickax post URL, like https://pickax.com/post/707864.");
       return;
     }
     setPostId(id);
     setStage("loading");
     try {
-      const auto = await tryAutoImport(id);
-      // Automatic import worked: build the image straight away.
-      const data: PostData = {
-        postId: id,
-        displayName: auto.displayName,
-        username: "",
-        avatar: null,
-        text: auto.text,
-        timestamp: "",
-        images: [],
-        engagement: {},
-      };
+      const payload = await fetchPostFromWorker(id);
+      const { data, notice } = await postDataFromWorker(payload);
+      setNotice(notice);
       await renderAndPreview(data);
     } catch (e) {
-      if (e instanceof AutoImportError && e.kind === "not-found") {
-        setStage("url");
-        setError("We couldn't find that Pickax post. Check the URL and try again.");
-        return;
-      }
-      // Expected path: Pickax blocks direct browser access (CORS), so fall
-      // back to the faster options below. State the limitation plainly.
+      // Automatic import failed: fall back to the fast alternatives instead
+      // of making the user type everything. State the limitation plainly.
       setNotice(
-        "This Pickax post couldn't be imported automatically. " +
-          "Pickax blocks direct browser access to post pages, so automatic " +
-          "import isn't possible. Instead of typing everything, go back and " +
-          "use the one-click bookmarklet or paste the page source — or enter " +
-          "the post details below exactly as they appear on Pickax and we'll " +
-          "build the image from what you provide. Nothing is invented or filled in."
+        workerErrorMessage(e) +
+          " Instead of typing everything, use the one-click bookmarklet or paste the page source below — or enter the post details exactly as they appear on Pickax and we'll build the image from what you provide. Nothing is invented or filled in."
       );
       setStage("manual");
     }
-  }
-
-  async function renderAndPreview(data: PostData) {
-    const canvas = await renderPostImage(data);
-    canvasRef.current = canvas;
-    setPreviewUrl(canvas.toDataURL("image/png"));
-    setStage("preview");
   }
 
   async function handleGenerateFromManual() {
@@ -291,9 +359,8 @@ export default function App() {
         timestamp: timestamp.trim(),
         images,
         engagement: {
-          likes: likes.trim() || undefined,
-          comments: comments.trim() || undefined,
-          reposts: reposts.trim() || undefined,
+          picks: picks.trim() || undefined,
+          axes: axes.trim() || undefined,
           views: views.trim() || undefined,
         },
       };
@@ -335,12 +402,18 @@ export default function App() {
     setImageUrl("");
   }
 
+  const toggle = (key: keyof RenderOptions) => ({
+    checked: options[key],
+    onChange: (e: React.ChangeEvent<HTMLInputElement>) =>
+      handleToggleChange({ ...options, [key]: e.target.checked }),
+  });
+
   return (
     <div className="page">
       <main className="card-wrap">
         <header className="hero">
           <h1>Pickax Post to Image</h1>
-          <p className="tagline">Turn a Pickax post into an image.</p>
+          <p className="tagline">Paste a post link, get the image.</p>
         </header>
 
         {stage === "url" && (
@@ -368,10 +441,13 @@ export default function App() {
             <p className="hint">
               Only public posts. Nothing is posted, stored, or shared — the
               image is built right in your browser.
+              {!workerConfigured() && (
+                <> Automatic import is still being switched on for this copy of the app.</>
+              )}
             </p>
 
             <div className="divider" aria-hidden="true">
-              <span>skip the typing</span>
+              <span>other ways in</span>
             </div>
 
             <h2 className="fast-title">One-click import</h2>
@@ -412,7 +488,7 @@ export default function App() {
         {stage === "loading" && (
           <section className="panel center">
             <div className="spinner" aria-hidden="true" />
-            <p className="muted">Trying to import the public post…</p>
+            <p className="muted">Reading the Pickax post…</p>
           </section>
         )}
 
@@ -468,43 +544,31 @@ export default function App() {
               className="text-input"
               value={timestamp}
               onChange={(e) => setTimestamp(e.target.value)}
-              placeholder="e.g. Sep 19, 2026"
+              placeholder="e.g. 1 hour ago"
             />
 
-            <div className="grid-4">
+            <div className="grid-3">
               <div>
-                <label className="field-label" htmlFor="likes">
-                  Likes
+                <label className="field-label" htmlFor="picks">
+                  Picks
                 </label>
                 <input
-                  id="likes"
+                  id="picks"
                   className="text-input"
-                  value={likes}
-                  onChange={(e) => setLikes(e.target.value)}
+                  value={picks}
+                  onChange={(e) => setPicks(e.target.value)}
                   placeholder="—"
                 />
               </div>
               <div>
-                <label className="field-label" htmlFor="comments">
-                  Comments
+                <label className="field-label" htmlFor="axes">
+                  Axes
                 </label>
                 <input
-                  id="comments"
+                  id="axes"
                   className="text-input"
-                  value={comments}
-                  onChange={(e) => setComments(e.target.value)}
-                  placeholder="—"
-                />
-              </div>
-              <div>
-                <label className="field-label" htmlFor="reposts">
-                  Reposts
-                </label>
-                <input
-                  id="reposts"
-                  className="text-input"
-                  value={reposts}
-                  onChange={(e) => setReposts(e.target.value)}
+                  value={axes}
+                  onChange={(e) => setAxes(e.target.value)}
                   placeholder="—"
                 />
               </div>
@@ -614,6 +678,21 @@ export default function App() {
                 alt="Generated Pickax post graphic"
               />
             )}
+            <fieldset className="toggles">
+              <legend>Show in image</legend>
+              <label className="toggle">
+                <input type="checkbox" {...toggle("showLogo")} /> Logo
+              </label>
+              <label className="toggle">
+                <input type="checkbox" {...toggle("showViews")} /> Views
+              </label>
+              <label className="toggle">
+                <input type="checkbox" {...toggle("showMedia")} /> Post images
+              </label>
+              <label className="toggle">
+                <input type="checkbox" {...toggle("showEngagement")} /> Picks &amp; axes
+              </label>
+            </fieldset>
             <div className="btn-row center">
               <button className="btn primary" onClick={handleDownload}>
                 Download PNG

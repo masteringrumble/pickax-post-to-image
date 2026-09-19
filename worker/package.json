@@ -1,0 +1,1 @@
+{"devDependencies":{"wrangler":"^3.0.0"},"name":"pickax-post-api","private":true,"scripts":{"deploy":"wrangler deploy"},"version":"1.0.0"}

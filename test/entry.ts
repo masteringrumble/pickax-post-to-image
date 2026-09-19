@@ -33,14 +33,21 @@ function makeCtx(): any {
     set fillStyle(_v: string) {},
     set strokeStyle(_v: string) {},
     set lineWidth(_v: number) {},
+    set lineCap(_v: string) {},
+    set globalAlpha(_v: number) {},
     set textAlign(_v: string) {},
     set textBaseline(_v: string) {},
+    ellipse() {},
+    createLinearGradient() {
+      return { addColorStop() {} };
+    },
     measureText(text: string) {
       const m = this._font.match(/(\d+(?:\.\d+)?)px/);
       const px = m ? parseFloat(m[1]) : 40;
       return { width: Array.from(text).length * px * 0.55 };
     },
     scale() {},
+    translate() {},
     beginPath() {},
     moveTo() {},
     lineTo() {},
@@ -100,6 +107,9 @@ function makeCanvas(w = 10, h = 10): any {
 }
 
 (globalThis as any).Image = StubImage;
+(globalThis as any).Path2D = class {
+  constructor(_d?: string) {}
+};
 (globalThis as any).document = { createElement: (_tag: string) => makeCanvas() };
 
 const CONTENT_W = 1200 - 64 * 2;
@@ -193,12 +203,12 @@ async function main() {
       text,
       timestamp: "Sep 19, 2026",
       images: [],
-      engagement: { likes: "1.2K", comments: "88", reposts: "12", views: "45K" },
+      engagement: { picks: "1.2K", axes: "3", views: "45K" },
     });
     assert.ok(canvas.height > 2000, `tall post grows height (got ${canvas.height})`);
     const texts = canvas._ctx.calls.filter((c: any) => c[0] === "fillText").map((c: any) => c[1]);
     assert.ok(texts.some((t: string) => t === "Sep 19, 2026"), "timestamp drawn");
-    assert.ok(texts.some((t: string) => t === "1.2K"), "likes drawn");
+    assert.ok(texts.some((t: string) => t === "1.2K"), "picks drawn");
     assert.ok(texts.some((t: string) => t === "45K"), "views drawn");
     for (const t of texts) {
       if (t.startsWith("@") || t.includes("pickax.com") || t === "Sep 19, 2026") continue;
@@ -313,13 +323,13 @@ async function main() {
 <meta property="og:url" content="https://pickax.com/post/707864">
 </head><body>
 <a aria-current="page" href="/post/707864" class="router-link-active router-link-exact-active absolute top-0 left-0 w-full h-full cursor-pointer z-0"></a>
-<a href="/MisfitElectronicGaming" class="cursor-pointer inline-block overflow-clip">Misfit Electronic Gaming</a>
-<a href="/MisfitElectronicGaming" class="cursor-pointer text-sm inline-block overflow-clip">@MisfitElectronicGaming</a>
 <a href="/MisfitElectronicGaming" class="cursor-pointer"><img src="https://img.pickax.com/user-8356/ea28e48e-147a-4169-bb97-ba71a823d48f.jpeg" alt="" loading="lazy" decoding="async" class="rounded-full object-cover w-10 h-10 min-w-10"></a>
-<time datetime="2026-09-19T17:11:00">Sep 19, 2026, 5:11 PM</time>
+<a href="/MisfitElectronicGaming" class="cursor-pointer inline-block overflow-clip">Misfit Electronic Gaming</a>
+<a href="/MisfitElectronicGaming" class="cursor-pointer text-sm inline-block overflow-clip">@MisfitElectronicGaming</a><span title="Sep 19, 2026, 9:11 PM" class="text-sm block font-thin">1 hour ago</span>
 <span class="inline-flex items-center gap-1 bg-dark3 px-2 rounded-full text-sm" title="Post views" aria-label="Post views: 6">6</span>
-<button class="font-poppins font-semibold"><svg></svg><div>1</div></button>
-<button class="font-poppins font-semibold"><svg></svg></button>
+<button class="font-poppins font-semibold"><svg><defs><linearGradient id="pg"><stop stop-color="#0083f5"/><stop stop-color="#00c4f5"/></linearGradient></defs></svg><div>1</div></button>
+<button class="font-poppins font-semibold"><svg><defs><linearGradient id="ag"><stop stop-color="#dc1919"/><stop stop-color="#f59b00"/></linearGradient></defs></svg></button>
+<iframe src="https://rumble.com/embed/v7djhge/" title="Splaterday stream"></iframe>
 <img src="https://img.pickax.com/post-1234/abcd.jpeg" alt="post image">
 </body></html>`;
 
@@ -340,12 +350,15 @@ async function main() {
       !p.text.includes("1311 Followers"),
       "SEO suffix stripped from text"
     );
-    assert.equal(p.timestamp, "2026-09-19T17:11:00");
+    assert.equal(p.timestamp, "1 hour ago");
     assert.deepEqual(p.imageUrls, [
       "https://img.pickax.com/post-1234/abcd.jpeg",
     ]);
-    assert.equal(p.likes, "1");
+    assert.equal(p.picks, "1");
+    assert.equal(p.axes, "0");
     assert.equal(p.views, "6");
+    assert.equal(p.videoSrc, "https://rumble.com/embed/v7djhge/");
+    assert.equal(p.videoTitle, "Splaterday stream");
 
     // Non-post HTML is rejected with a helpful error, not garbage data.
     let threw = false;
@@ -392,8 +405,10 @@ async function main() {
     assert.equal(payload.username, "MisfitElectronicGaming");
     assert.ok(payload.avatar.includes("img.pickax.com/user-8356"));
     assert.ok(!payload.text.includes("1311 Followers"));
-    assert.equal(payload.likes, "1");
+    assert.equal(payload.picks, "1");
+    assert.equal(payload.axes, "0");
     assert.equal(payload.views, "6");
+    assert.equal(payload.videoSrc, "https://rumble.com/embed/v7djhge/");
     assert.deepEqual(payload.images, [
       "https://img.pickax.com/post-1234/abcd.jpeg",
     ]);

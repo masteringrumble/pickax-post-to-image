@@ -13,7 +13,12 @@ export interface ParsedImport {
   text: string;
   timestamp: string;
   imageUrls: string[];
-  likes: string;
+  videoSrc: string;
+  videoTitle: string;
+  /** Pickax "pick" (like) count. */
+  picks: string;
+  /** Pickax "axe" (dislike) count. */
+  axes: string;
   views: string;
 }
 
@@ -78,19 +83,49 @@ function extractViews(doc: Document): string {
   return firstNumber(el?.getAttribute("aria-label") ?? "");
 }
 
-// The like button is the button whose visible text is just a count.
-function extractLikes(doc: Document): string {
+// Picks/axes are icon-only buttons carrying their brand gradients: the pick
+// button uses #0083f5 -> #00c4f5, the axe button #dc1919 -> #f59b00. The
+// count is a bare number next to the icon (hidden entirely at 0 for axes).
+function buttonCount(doc: Document, gradientMarker: string): string {
   const buttons = Array.from(doc.querySelectorAll("button"));
   for (const b of buttons) {
-    const t = (b.textContent ?? "").trim();
-    if (/^\d[\d,]*$/.test(t)) return t;
+    if (!b.innerHTML.includes(gradientMarker)) continue;
+    const m = (b.textContent ?? "").trim().match(/(\d[\d,]*)/);
+    return m ? m[1] : "0";
   }
   return "";
 }
 
+function extractPicks(doc: Document): string {
+  return buttonCount(doc, "0083f5");
+}
+
+function extractAxes(doc: Document): string {
+  return buttonCount(doc, "dc1919");
+}
+
 function extractTimestamp(doc: Document): string {
-  const t = doc.querySelector("time[datetime]");
-  return t?.getAttribute("datetime")?.trim() ?? "";
+  // The relative timestamp sits in the <span title="Sep 19, 2026, 9:11 PM">
+  // right after the author's @username link.
+  const anchors = Array.from(doc.querySelectorAll('a[href^="/"]'));
+  for (const a of anchors) {
+    const t = (a.textContent ?? "").trim();
+    if (t.startsWith("@") && t.length > 1) {
+      const sib = a.nextElementSibling;
+      if (sib && sib.tagName === "SPAN") return (sib.textContent ?? "").trim();
+      break;
+    }
+  }
+  const tm = doc.querySelector("time[datetime]");
+  return tm?.getAttribute("datetime")?.trim() ?? "";
+}
+
+function extractVideo(doc: Document): { src: string; title: string } {
+  const f = doc.querySelector('iframe[src*="rumble.com/embed"]');
+  return {
+    src: f?.getAttribute("src")?.trim() ?? "",
+    title: f?.getAttribute("title")?.trim() ?? "",
+  };
 }
 
 export class ImportParseError extends Error {}
@@ -116,6 +151,8 @@ export function parsePostHtml(html: string): ParsedImport {
   const idMatch = ogUrl.match(/\/post\/(\d+)/);
   if (idMatch) postId = idMatch[1];
 
+  const video = extractVideo(doc);
+
   return {
     postId,
     displayName,
@@ -124,7 +161,10 @@ export function parsePostHtml(html: string): ParsedImport {
     text,
     timestamp: extractTimestamp(doc),
     imageUrls: extractImageUrls(doc, avatarUrl),
-    likes: extractLikes(doc),
+    videoSrc: video.src,
+    videoTitle: video.title,
+    picks: extractPicks(doc),
+    axes: extractAxes(doc),
     views: extractViews(doc),
   };
 }
@@ -167,7 +207,11 @@ function coerceImport(raw: unknown): ParsedImport | null {
     text: cleanDescription(str(o.text)),
     timestamp: str(o.timestamp),
     imageUrls,
-    likes: str(o.likes),
+    videoSrc: str(o.videoSrc),
+    videoTitle: str(o.videoTitle),
+    // v1 bookmarklets sent `likes`; treat it as the pick count.
+    picks: str(o.picks) || str(o.likes),
+    axes: str(o.axes),
     views: str(o.views),
   };
   if (!parsed.displayName && !parsed.text && !parsed.username) return null;
@@ -204,20 +248,25 @@ export const BOOKMARKLET: string =
   "var d=document," +
   "q=function(s){return d.querySelector(s)}," +
   "meta=function(p){var e=q('meta[property=\"'+p+'\"]');return e?e.getAttribute('content')||'':''}," +
-  "o={v:1,postId:'',displayName:(meta('og:title')||'').replace(/\\s+posted\\s*$/i,'')," +
+  "o={v:2,postId:'',displayName:(meta('og:title')||'').replace(/\\s+posted\\s*$/i,'')," +
   "text:(meta('og:description')||'').replace(/\\s*user=\\S+\\s+[\\d,]+\\s+Followers\\s*$/i,'')," +
-  "username:'',avatar:'',timestamp:'',likes:'',views:'',images:[]};" +
+  "username:'',avatar:'',timestamp:'',picks:'',axes:'',views:'',videoSrc:'',videoTitle:'',images:[]};" +
   "Array.prototype.forEach.call(d.querySelectorAll('a[href^=\"/\"]'),function(a){" +
   "var t=(a.textContent||'').trim();" +
-  "if(!o.username&&t.charAt(0)==='@'&&t.length>1)o.username=t.slice(1).trim();});" +
+  "if(t.charAt(0)==='@'&&t.length>1){" +
+  "if(!o.username)o.username=t.slice(1).trim();" +
+  "var s=a.nextElementSibling;" +
+  "if(s&&s.tagName==='SPAN'&&s.getAttribute('title')&&!o.timestamp)o.timestamp=(s.textContent||'').trim();}});" +
   "var av=q('img.rounded-full[src*=\"img.pickax.com\"]');" +
   "if(av)o.avatar=av.src;" +
   "var vs=q('span[title=\"Post views\"]');" +
   "if(vs){var vm=(vs.getAttribute('aria-label')||'').match(/(\\d[\\d,]*)/);if(vm)o.views=vm[1];}" +
   "Array.prototype.forEach.call(d.querySelectorAll('button'),function(b){" +
-  "var t=(b.textContent||'').trim();" +
-  "if(!o.likes&&/^\\d[\\d,]*$/.test(t))o.likes=t;});" +
-  "var tm=q('time[datetime]');if(tm)o.timestamp=tm.getAttribute('datetime')||'';" +
+  "var h=b.innerHTML||'',t=(b.textContent||'').trim(),m=t.match(/(\\d[\\d,]*)/);" +
+  "if(h.indexOf('0083f5')>-1&&!o.picks)o.picks=m?m[1]:'0';" +
+  "if(h.indexOf('dc1919')>-1&&!o.axes)o.axes=m?m[1]:'0';});" +
+  "var fr=q('iframe[src*=\"rumble.com/embed\"]');" +
+  "if(fr){o.videoSrc=fr.src||'';o.videoTitle=fr.getAttribute('title')||'';}" +
   "o.images=Array.prototype.filter.call(d.querySelectorAll('img[src*=\"img.pickax.com\"]')," +
   "function(i){return i!==av;}).map(function(i){return i.src;}).slice(0,4);" +
   "var pm=location.pathname.match(/\\/post\\/(\\d+)/);if(pm)o.postId=pm[1];" +
