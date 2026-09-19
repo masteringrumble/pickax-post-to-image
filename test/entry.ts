@@ -234,6 +234,27 @@ async function main() {
     console.log(`ok  long post renders without overflow (canvas ${canvas.width}x${canvas.height})`);
   }
 
+  // ---- 5b. renderer: enormous post stays within browser canvas limits ------
+  {
+    const para = "Lorem ipsum dolor sit amet. ";
+    const canvas: any = await renderPostImage({
+      postId: "707864",
+      displayName: "Misfit Electronic Gaming",
+      username: "misfit",
+      verified: null,
+      avatar: null,
+      text: Array(2000).fill(para).join("\n\n"),
+      timestamp: "",
+      images: [],
+      engagement: {},
+    });
+    assert.ok(canvas.height <= 16384, `canvas capped (got ${canvas.height})`);
+    assert.ok(canvas.height > 16384 / 2, "still renders at reduced scale");
+    const texts = canvas._ctx.calls.filter((c: any) => c[0] === "fillText").map((c: any) => c[1]);
+    assert.ok(texts.join(" ").includes("Lorem ipsum"), "text drawn");
+    console.log(`ok  enormous post capped (canvas ${canvas.width}x${canvas.height})`);
+  }
+
   // ---- 6. renderer: images (1 and 3) + avatar --------------------------------
   {
     const mkImg = (w: number, h: number) => {
@@ -341,6 +362,7 @@ async function main() {
 <button class="font-poppins font-semibold"><svg><defs><linearGradient id="ag"><stop stop-color="#dc1919"/><stop stop-color="#f59b00"/></linearGradient></defs></svg></button>
 <iframe src="https://rumble.com/embed/v7djhge/" title="Splaterday stream"></iframe>
 <img src="https://img.pickax.com/post-1234/abcd.jpeg" alt="post image">
+<script type="application/json" data-nuxt-data="nuxt-app" data-ssr="true" id="__NUXT_DATA__">[707864,"2026-09-19T21:11:24.468Z","2026-09-19T23:12:22.674Z",null,"&#x1F534;&#x1F6A9;LIVE | | Splaterday | |&nbsp;<br>Halloween: The Game  | |&nbsp;<br>Dead  By  Daylight Come Hang out Need Wtch Hr<br><br>Now on Drop Live<br><br>@gamingonrumble @rumblevideo<br><br>#RumbleTakeover<br>Like, Comment, Follow &amp; Share.",8356]</script>
 </body></html>`;
 
     (globalThis as any).DOMParser = new JSDOM("").window.DOMParser;
@@ -361,6 +383,11 @@ async function main() {
       !p.text.includes("1311 Followers"),
       "SEO suffix stripped from text"
     );
+    assert.ok(
+      p.text.includes("#RumbleTakeover"),
+      "full body from page payload beats truncated og:description"
+    );
+    assert.ok(p.text.includes("\n"), "payload <br> line breaks preserved");
     assert.equal(p.timestamp, "1 hour ago");
     assert.deepEqual(p.imageUrls, [
       "https://img.pickax.com/post-1234/abcd.jpeg",

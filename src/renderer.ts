@@ -466,11 +466,15 @@ export async function renderPostImage(
   const H = cardH;
 
   // ---- create canvas ------------------------------------------------------
+  // Browsers blank (or refuse) canvases past ~16384px per side; shrink the
+  // render scale for very long posts so all of the text still fits.
+  const MAX_DIM = 16384;
+  const scale = Math.min(SCALE, MAX_DIM / W, MAX_DIM / Math.ceil(H));
   const canvas = document.createElement("canvas");
-  canvas.width = W * SCALE;
-  canvas.height = Math.ceil(H * SCALE);
+  canvas.width = Math.round(W * scale);
+  canvas.height = Math.ceil(H * scale);
   const ctx = canvas.getContext("2d")!;
-  ctx.scale(SCALE, SCALE);
+  ctx.scale(scale, scale);
 
   // the post card is the entire image — no background outside of it
   roundRectPath(ctx, 0, 0, W, cardH, CARD_RADIUS);

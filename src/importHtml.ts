@@ -39,6 +39,46 @@ function cleanTitle(title: string): string {
   return title.replace(/\s+posted\s*$/i, "").trim();
 }
 
+/**
+ * Full post body from the __NUXT_DATA__ payload. og:description is truncated
+ * (~120 chars); the payload carries the complete text with <br> line breaks.
+ * The body sits just after the post id in document order.
+ */
+function extractFullText(doc: Document, postId: string): string | null {
+  const el = doc.getElementById("__NUXT_DATA__");
+  const raw = el?.textContent;
+  if (!raw) return null;
+  let payload: unknown;
+  try {
+    payload = JSON.parse(raw);
+  } catch {
+    return null;
+  }
+  const strings: string[] = [];
+  const walk = (o: unknown): void => {
+    if (typeof o === "string" || typeof o === "number") strings.push(String(o));
+    else if (Array.isArray(o)) o.forEach(walk);
+    else if (o && typeof o === "object") Object.values(o).forEach(walk);
+  };
+  walk(payload);
+  const at = strings.findIndex((s) => s === postId);
+  const pool = at === -1 ? strings : strings.slice(at);
+  let best: string | null = null;
+  const consider = (s: string) => {
+    if (s.includes("<br") && s.length > 80 && (!best || s.length > best.length))
+      best = s;
+  };
+  pool.forEach(consider);
+  if (!best && at !== -1) strings.forEach(consider);
+  if (!best) return null;
+  const body: string = best;
+  // <br> -> newline first, then let the DOM decode entities/strip tags.
+  const div = doc.createElement("div");
+  div.innerHTML = body.replace(/<br\s*\/?>/gi, "\n").replace(/&nbsp;/gi, " ");
+  const cleaned = (div.textContent ?? "").replace(/\n{3,}/g, "\n\n").trim();
+  return cleaned || null;
+}
+
 function metaContent(doc: Document, property: string): string {
   const el = doc.querySelector(`meta[property="${property}"]`);
   return el?.getAttribute("content")?.trim() ?? "";
@@ -182,9 +222,19 @@ export function parsePostHtml(html: string): ParsedImport {
   const doc = new DOMParser().parseFromString(html, "text/html");
 
   const displayName = cleanTitle(metaContent(doc, "og:title"));
-  const text = cleanDescription(metaContent(doc, "og:description"));
   const username = extractUsername(doc);
   const avatarUrl = extractAvatarUrl(doc);
+
+  let postId = "";
+  const ogUrl = metaContent(doc, "og:url");
+  const idMatch = ogUrl.match(/\/post\/(\d+)/);
+  if (idMatch) postId = idMatch[1];
+
+  // Full body from the page payload when present; truncated og:description
+  // is only the fallback.
+  const text =
+    extractFullText(doc, postId) ||
+    cleanDescription(metaContent(doc, "og:description"));
 
   if (!displayName && !text && !username) {
     throw new ImportParseError(
@@ -193,11 +243,6 @@ export function parsePostHtml(html: string): ParsedImport {
         "source, copy everything, and paste it here."
     );
   }
-
-  let postId = "";
-  const ogUrl = metaContent(doc, "og:url");
-  const idMatch = ogUrl.match(/\/post\/(\d+)/);
-  if (idMatch) postId = idMatch[1];
 
   const video = extractVideo(doc, html);
 
@@ -307,7 +352,7 @@ export const BOOKMARKLET: string =
   "var d=document," +
   "q=function(s){return d.querySelector(s)}," +
   "meta=function(p){var e=q('meta[property=\"'+p+'\"]');return e?e.getAttribute('content')||'':''}," +
-  "o={v:3,postId:'',displayName:(meta('og:title')||'').replace(/\\s+posted\\s*$/i,'')," +
+  "o={v:4,postId:'',displayName:(meta('og:title')||'').replace(/\\s+posted\\s*$/i,'')," +
   "text:(meta('og:description')||'').replace(/\\s*user=\\S+\\s+[\\d,]+\\s+Followers\\s*$/i,'')," +
   "username:'',verified:'',avatar:'',timestamp:'',picks:'',axes:'',views:'',videoSrc:'',videoTitle:'',videoThumb:'',images:[]};" +
   "Array.prototype.forEach.call(d.querySelectorAll('a[href^=\"/\"]'),function(a){" +
@@ -340,5 +385,14 @@ export const BOOKMARKLET: string =
   "o.images=Array.prototype.filter.call(d.querySelectorAll('img[src*=\"img.pickax.com\"]')," +
   "function(i){return i!==av;}).map(function(i){return i.src;}).slice(0,4);" +
   "var pm=location.pathname.match(/\\/post\\/(\\d+)/);if(pm)o.postId=pm[1];" +
+  // Full post body from the page payload (og:description is truncated).
+  "var nd=d.getElementById('__NUXT_DATA__');" +
+  "if(nd&&o.postId){try{var J=JSON.parse(nd.textContent||''),SS=[];" +
+  "(function wk(o){if(typeof o==='string'||typeof o==='number')SS.push(''+o);else if(o&&typeof o==='object')for(var k in o)wk(o[k]);})(J);" +
+  "var si=SS.indexOf(o.postId),bt='';" +
+  "for(var i3=(si<0?0:si);i3<SS.length;i3++){var s3=SS[i3];if(s3.indexOf('<br')>-1&&s3.length>80&&s3.length>bt.length)bt=s3;}" +
+  "if(!bt)for(var j3=0;j3<SS.length;j3++){var t3=SS[j3];if(t3.indexOf('<br')>-1&&t3.length>80&&t3.length>bt.length)bt=t3;}" +
+  "if(bt){var dv=d.createElement('div');dv.innerHTML=bt.replace(/<br\\s*\\/?>/gi,'\\n').replace(/&nbsp;/gi,' ');" +
+  "var ct=(dv.textContent||'').replace(/\\n{3,}/g,'\\n\\n').trim();if(ct)o.text=ct;}}catch(e){}}" +
   "location.href='" + APP_URL + "#import='+encodeURIComponent(JSON.stringify(o));" +
   "})()";

@@ -34,6 +34,51 @@ function cleanDescription(desc: string): string {
   return desc.replace(/\s*user=[\w.]+\s+[\d,]+\s+Followers\s*$/i, "").trim();
 }
 
+/**
+ * Full post body from the __NUXT_DATA__ payload. og:description is truncated
+ * (~120 chars); the payload carries the complete text with <br> line breaks.
+ * The body sits just after the post id in document order.
+ */
+function extractFullText(html: string, postId: string): string | null {
+  const block = html.match(
+    /<script[^>]*id="__NUXT_DATA__"[^>]*>([\s\S]*?)<\/script>/i
+  );
+  if (!block) return null;
+  let payload: unknown;
+  try {
+    payload = JSON.parse(block[1]);
+  } catch {
+    return null;
+  }
+  const strings: string[] = [];
+  const walk = (o: unknown): void => {
+    if (typeof o === "string" || typeof o === "number") strings.push(String(o));
+    else if (Array.isArray(o)) o.forEach(walk);
+    else if (o && typeof o === "object") Object.values(o).forEach(walk);
+  };
+  walk(payload);
+  const at = strings.findIndex((s) => s === postId);
+  const pool = at === -1 ? strings : strings.slice(at);
+  let best: string | null = null;
+  const consider = (s: string) => {
+    if (s.includes("<br") && s.length > 80 && (!best || s.length > best.length))
+      best = s;
+  };
+  pool.forEach(consider);
+  if (!best && at !== -1) strings.forEach(consider);
+  if (!best) return null;
+  const body: string = best;
+  const cleaned = decodeEntities(
+    body
+      .replace(/<br\s*\/?>/gi, "\n")
+      .replace(/&nbsp;/gi, " ")
+      .replace(/<[^>]+>/g, "")
+  )
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+  return cleaned || null;
+}
+
 export interface PostPayload {
   postId: string;
   postUrl: string;
@@ -166,9 +211,12 @@ export function extract(html: string, postId: string, postUrl: string): PostPayl
 
   const viewsMatch = html.match(/aria-label="Post views:\s*([\d,]+)"/i);
 
-  // Post text: og:description minus the SEO suffix (verified against live page).
+  // Post text: full body from the __NUXT_DATA__ payload when present;
+  // og:description (truncated) is only the fallback.
   const rawDesc = metaContent(html, "og:description");
-  const text = rawDesc ? cleanDescription(rawDesc) : null;
+  const text =
+    extractFullText(html, postId) ??
+    (rawDesc ? cleanDescription(rawDesc) : null);
 
   // NOTE: picks/axes selectors are being confirmed against the live site.
   // They stay null (omitted from the image) until verified — we do NOT reuse
