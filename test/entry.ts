@@ -5,8 +5,16 @@
 // valid URLs accepted, text wrapped verbatim, nothing cut off, logo drawn,
 // missing data omitted (never invented).
 import assert from "node:assert";
+import { JSDOM } from "jsdom";
 import { wrapText, wrapParagraph } from "../src/lib/text";
 import { extractPostId } from "../src/pickax";
+import {
+  BOOKMARKLET,
+  cleanDescription,
+  parseImportHash,
+  parsePostHtml,
+  prettyTimestamp,
+} from "../src/importHtml";
 import { renderPostImage } from "../src/renderer";
 
 // ---- minimal canvas 2d context stub ---------------------------------------
@@ -253,6 +261,154 @@ async function main() {
     assert.ok(!texts.some((t: string) => /♡|💬|↻|👁/.test(t)), "no engagement invented");
     assert.ok(texts.some((t: string) => t === "minimal"), "text drawn");
     console.log("ok  missing data omitted, nothing invented");
+  }
+
+  // ---- 8. cleanDescription: strip Pickax's SEO suffix, keep the post ------
+  {
+    assert.equal(
+      cleanDescription(
+        "Come hang out! user=misfit_electronic_gaming 1311 Followers"
+      ),
+      "Come hang out!"
+    );
+    assert.equal(
+      cleanDescription("Hello world user=someone 1,234 Followers"),
+      "Hello world"
+    );
+    assert.equal(
+      cleanDescription("Just a normal post, no suffix here"),
+      "Just a normal post, no suffix here"
+    );
+    assert.equal(
+      cleanDescription("user=someone is my friend, 5 Followers rock"),
+      "user=someone is my friend, 5 Followers rock",
+      "mid-text occurrences are kept"
+    );
+    console.log("ok  cleanDescription (SEO suffix stripped, post kept)");
+  }
+
+  // ---- 9. prettyTimestamp ---------------------------------------------------
+  {
+    assert.equal(prettyTimestamp(""), "");
+    const iso = prettyTimestamp("2026-09-19T17:11:00");
+    assert.ok(iso.includes("2026"), `ISO formatted readably (got ${iso})`);
+    assert.ok(!iso.includes("T17"), "no raw ISO time leak");
+    assert.equal(
+      prettyTimestamp("48 minutes ago"),
+      "48 minutes ago",
+      "non-ISO passes through"
+    );
+    console.log("ok  prettyTimestamp (ISO -> readable, passthrough)");
+  }
+
+  // ---- 10. parsePostHtml + bookmarklet, end to end --------------------------
+  // Fixture mirrors the real inspected Pickax post page structure.
+  {
+    const FIXTURE_HTML = `<!DOCTYPE html><html><head>
+<title>Misfit Electronic Gaming posted</title>
+<meta name="description" content="post desc">
+<meta property="og:title" content="Misfit Electronic Gaming posted">
+<meta property="og:description" content="&#x1F534;&#x1F6A9;LIVE | | Splaterday Come Hang out Need Wtch Hr Now on Drop Live user=misfit_electronic_gaming 1311 Followers">
+<meta property="og:image" content="https://pickax.com/favicon.png">
+<meta property="og:url" content="https://pickax.com/post/707864">
+</head><body>
+<a aria-current="page" href="/post/707864" class="router-link-active router-link-exact-active absolute top-0 left-0 w-full h-full cursor-pointer z-0"></a>
+<a href="/MisfitElectronicGaming" class="cursor-pointer inline-block overflow-clip">Misfit Electronic Gaming</a>
+<a href="/MisfitElectronicGaming" class="cursor-pointer text-sm inline-block overflow-clip">@MisfitElectronicGaming</a>
+<a href="/MisfitElectronicGaming" class="cursor-pointer"><img src="https://img.pickax.com/user-8356/ea28e48e-147a-4169-bb97-ba71a823d48f.jpeg" alt="" loading="lazy" decoding="async" class="rounded-full object-cover w-10 h-10 min-w-10"></a>
+<time datetime="2026-09-19T17:11:00">Sep 19, 2026, 5:11 PM</time>
+<span class="inline-flex items-center gap-1 bg-dark3 px-2 rounded-full text-sm" title="Post views" aria-label="Post views: 6">6</span>
+<button class="font-poppins font-semibold"><svg></svg><div>1</div></button>
+<button class="font-poppins font-semibold"><svg></svg></button>
+<img src="https://img.pickax.com/post-1234/abcd.jpeg" alt="post image">
+</body></html>`;
+
+    (globalThis as any).DOMParser = new JSDOM("").window.DOMParser;
+    const p = parsePostHtml(FIXTURE_HTML);
+    assert.equal(p.postId, "707864");
+    assert.equal(p.displayName, "Misfit Electronic Gaming");
+    assert.equal(p.username, "MisfitElectronicGaming");
+    assert.equal(
+      p.avatarUrl,
+      "https://img.pickax.com/user-8356/ea28e48e-147a-4169-bb97-ba71a823d48f.jpeg"
+    );
+    assert.ok(
+      p.text.startsWith("\u{1F534}\u{1F6A9}LIVE"),
+      "post text extracted"
+    );
+    assert.ok(
+      !p.text.includes("1311 Followers"),
+      "SEO suffix stripped from text"
+    );
+    assert.equal(p.timestamp, "2026-09-19T17:11:00");
+    assert.deepEqual(p.imageUrls, [
+      "https://img.pickax.com/post-1234/abcd.jpeg",
+    ]);
+    assert.equal(p.likes, "1");
+    assert.equal(p.views, "6");
+
+    // Non-post HTML is rejected with a helpful error, not garbage data.
+    let threw = false;
+    try {
+      parsePostHtml("<html><head><title>nope</title></head><body></body></html>");
+    } catch {
+      threw = true;
+    }
+    assert.ok(threw, "non-post HTML rejected");
+    console.log("ok  parsePostHtml (all fields extracted, junk rejected)");
+
+    // The real bookmarklet code, executed against the fixture DOM.
+    const dom = new JSDOM(FIXTURE_HTML, {
+      url: "https://pickax.com/post/707864",
+    });
+    let navigated = "";
+    const fakeLocation = {
+      pathname: "/post/707864",
+      get href() {
+        return "https://pickax.com/post/707864";
+      },
+      set href(v: string) {
+        navigated = v;
+      },
+    };
+    const body = BOOKMARKLET.replace(/^javascript:/, "");
+    const fn = new (dom.window as any).Function(
+      "document",
+      "location",
+      body
+    );
+    fn(dom.window.document, fakeLocation);
+    assert.ok(
+      navigated.startsWith(
+        "https://masteringrumble.github.io/pickax-post-to-image/#import="
+      ),
+      `bookmarklet navigates to app (got ${navigated.slice(0, 60)}…)`
+    );
+    const payload = JSON.parse(
+      decodeURIComponent(navigated.split("#import=")[1])
+    );
+    assert.equal(payload.postId, "707864");
+    assert.equal(payload.displayName, "Misfit Electronic Gaming");
+    assert.equal(payload.username, "MisfitElectronicGaming");
+    assert.ok(payload.avatar.includes("img.pickax.com/user-8356"));
+    assert.ok(!payload.text.includes("1311 Followers"));
+    assert.equal(payload.likes, "1");
+    assert.equal(payload.views, "6");
+    assert.deepEqual(payload.images, [
+      "https://img.pickax.com/post-1234/abcd.jpeg",
+    ]);
+
+    // The app side: parseImportHash reads the same payload back.
+    (globalThis as any).window = {
+      location: { hash: "#import=" + encodeURIComponent(JSON.stringify(payload)) },
+      history: { replaceState: () => {} },
+    };
+    const back = parseImportHash();
+    assert.ok(back, "hash parsed");
+    assert.equal(back!.username, "MisfitElectronicGaming");
+    assert.equal(back!.postId, "707864");
+    delete (globalThis as any).window;
+    console.log("ok  bookmarklet end-to-end (extract -> hash -> parse back)");
   }
 
   console.log("\nALL SMOKE TESTS PASSED");

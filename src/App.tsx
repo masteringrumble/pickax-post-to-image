@@ -1,5 +1,14 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { extractPostId, tryAutoImport, AutoImportError } from "./pickax";
+import {
+  BOOKMARKLET,
+  clearImportHash,
+  parseImportHash,
+  parsePostHtml,
+  prettyTimestamp,
+  ImportParseError,
+  type ParsedImport,
+} from "./importHtml";
 import { renderPostImage } from "./renderer";
 import type { LoadedImage, PostData } from "./types";
 import "./styles.css";
@@ -61,7 +70,17 @@ export default function App() {
   const [imageUrlList, setImageUrlList] = useState<string[]>([]);
 
   const [previewUrl, setPreviewUrl] = useState("");
+  const [htmlSource, setHtmlSource] = useState("");
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+
+  // One-click import: the bookmarklet opens the app with #import=<data>.
+  useEffect(() => {
+    const imported = parseImportHash();
+    if (!imported) return;
+    clearImportHash();
+    void importParsed(imported, true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   function resetAll() {
     setStage("url");
@@ -83,7 +102,87 @@ export default function App() {
     setImageUrl("");
     setImageUrlList([]);
     setPreviewUrl("");
+    setHtmlSource("");
     canvasRef.current = null;
+  }
+
+  // Build the image from data extracted from the post page (bookmarklet or
+  // pasted page source). Remote images load with CORS; anything that fails
+  // is reported honestly and omitted, never invented.
+  async function importParsed(p: ParsedImport, fromBookmarklet: boolean) {
+    setError("");
+    setNotice("");
+    setPostId(p.postId);
+    setStage("loading");
+
+    let avatar: HTMLImageElement | null = null;
+    let avatarFailed = false;
+    if (p.avatarUrl) {
+      try {
+        avatar = await loadImageFromUrl(p.avatarUrl);
+      } catch {
+        avatarFailed = true;
+      }
+    }
+
+    const images: LoadedImage[] = [];
+    let imageFailed = false;
+    for (const u of p.imageUrls.slice(0, MAX_POST_IMAGES)) {
+      try {
+        images.push(toLoaded(await loadImageFromUrl(u)));
+      } catch {
+        imageFailed = true;
+      }
+    }
+
+    let notice =
+      (fromBookmarklet
+        ? "Imported from the post page in one click. "
+        : "Imported from the page source. ") +
+      "Give it a quick look before downloading.";
+    if (avatarFailed)
+      notice += " The profile picture couldn't be loaded, so a placeholder is used instead.";
+    if (imageFailed)
+      notice += " The post was imported, but an attached image couldn't be loaded.";
+    setNotice(notice);
+
+    const data: PostData = {
+      postId: p.postId,
+      displayName: p.displayName,
+      username: p.username,
+      avatar,
+      text: p.text.replace(/\r\n/g, "\n"),
+      timestamp: prettyTimestamp(p.timestamp),
+      images,
+      engagement: {
+        likes: p.likes || undefined,
+        views: p.views || undefined,
+      },
+    };
+    try {
+      await renderAndPreview(data);
+    } catch {
+      setStage("url");
+      setError("Something went wrong while generating the image. Please try again.");
+    }
+  }
+
+  async function handleImportFromHtml() {
+    setError("");
+    setNotice("");
+    if (!htmlSource.trim()) {
+      setError(
+        "Paste the page source first — open the post, press Ctrl+U (Mac: Cmd+Option+U), copy everything, and paste it here."
+      );
+      return;
+    }
+    try {
+      const parsed = parsePostHtml(htmlSource);
+      await importParsed(parsed, false);
+    } catch (e) {
+      if (e instanceof ImportParseError) setError(e.message);
+      else setError("Something went wrong while reading the page source. Please try again.");
+    }
   }
 
   async function handleGenerateFromUrl() {
@@ -117,13 +216,14 @@ export default function App() {
         return;
       }
       // Expected path: Pickax blocks direct browser access (CORS), so fall
-      // back to manual entry. State the limitation plainly.
+      // back to the faster options below. State the limitation plainly.
       setNotice(
         "This Pickax post couldn't be imported automatically. " +
           "Pickax blocks direct browser access to post pages, so automatic " +
-          "import isn't possible. Enter the post details below exactly as " +
-          "they appear on Pickax and we'll build the image from what you " +
-          "provide — nothing is invented or filled in."
+          "import isn't possible. Instead of typing everything, go back and " +
+          "use the one-click bookmarklet or paste the page source — or enter " +
+          "the post details below exactly as they appear on Pickax and we'll " +
+          "build the image from what you provide. Nothing is invented or filled in."
       );
       setStage("manual");
     }
@@ -269,6 +369,43 @@ export default function App() {
               Only public posts. Nothing is posted, stored, or shared — the
               image is built right in your browser.
             </p>
+
+            <div className="divider" aria-hidden="true">
+              <span>skip the typing</span>
+            </div>
+
+            <h2 className="fast-title">One-click import</h2>
+            <p className="muted small">
+              Drag this button to your bookmarks bar. Then, while viewing any
+              Pickax post, click it — the post opens here with everything
+              filled in.
+            </p>
+            <a
+              className="btn primary bookmarklet"
+              href={BOOKMARKLET}
+              onClick={(e) => e.preventDefault()}
+              title="Drag me to your bookmarks bar"
+            >
+              📥 Pickax → Image
+            </a>
+
+            <h2 className="fast-title">Or paste the page source</h2>
+            <p className="muted small">
+              Open the post in your browser, press{" "}
+              <kbd>Ctrl</kbd>+<kbd>U</kbd> (Mac: <kbd>⌘</kbd>+<kbd>⌥</kbd>+
+              <kbd>U</kbd>), copy everything, and paste it below:
+            </p>
+            <textarea
+              className="text-input textarea mono"
+              rows={4}
+              value={htmlSource}
+              onChange={(e) => setHtmlSource(e.target.value)}
+              placeholder="Paste the full page source here…"
+              spellCheck={false}
+            />
+            <button className="btn" onClick={handleImportFromHtml}>
+              Import from page source
+            </button>
           </section>
         )}
 
