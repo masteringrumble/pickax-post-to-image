@@ -3,7 +3,7 @@
 // pickax.com directly (no CORS headers), so the worker does it where CORS
 // doesn't apply. Public posts only — no login, no session, nothing stored.
 
-export const WORKER_BASE = "https://__WORKER_HOST__";
+export const WORKER_BASE = "https://pickax-post-api.masteringrumble.workers.dev";
 
 export interface WorkerPostVideo {
   src: string;
@@ -55,9 +55,11 @@ export async function fetchPostFromWorker(
   const timer = window.setTimeout(() => ctrl.abort(), 20000);
   let res: Response;
   try {
-    res = await fetch(`${WORKER_BASE}/post/${encodeURIComponent(postId)}`, {
-      signal: ctrl.signal,
-    });
+    const target = `https://pickax.com/post/${encodeURIComponent(postId)}`;
+    res = await fetch(
+      `${WORKER_BASE}/post?url=${encodeURIComponent(target)}`,
+      { signal: ctrl.signal }
+    );
   } catch {
     window.clearTimeout(timer);
     throw new WorkerError("network");
