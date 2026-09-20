@@ -892,7 +892,7 @@ export default function App() {
                   <input type="checkbox" {...toggle("showMedia")} /> Post images
                 </label>
               )}
-              {previewData?.linkCard && (
+              {previewData?.linkCard && !previewData.video && (
                 <label className="toggle">
                   <input type="checkbox" {...toggle("showLinkCard")} /> Site embed
                 </label>

@@ -850,6 +850,32 @@ async function main() {
       });
       assert.ok(postImgDrawn(noLink), "showLinkCard=false keeps the post image");
       assert.ok(!linkTextDrawn(noLink), "showLinkCard=false removes all site text");
+
+      // Video posts: the video player itself is the embed, so the link
+      // card never renders there even with showLinkCard on.
+      const videoPost: any = await renderPostImage(
+        {
+          ...dataWithBoth,
+          images: [],
+          video: {
+            src: "https://rumble.com/embed/v123/",
+            title: "Some video",
+            thumbnail: null,
+          },
+        },
+        allOpts
+      );
+      const videoTexts = videoPost._ctx.calls
+        .filter((c: any) => c[0] === "fillText")
+        .map((c: any) => c[1]);
+      assert.ok(
+        videoTexts.some((t: string) => t === "Some video"),
+        "video placeholder drawn"
+      );
+      assert.ok(
+        !linkTextDrawn(videoPost),
+        "link card suppressed on video posts"
+      );
       console.log("ok  site-embed toggle is independent of the post-images toggle");
     }
 
