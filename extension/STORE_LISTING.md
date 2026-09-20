@@ -19,8 +19,7 @@
 >    same "Show in image" choices as the website: Logo, Views, Post images,
 >    Site embed, Picks & axes (each shown only when the post has that
 >    content). The preview updates as you flip toggles. Hit Download PNG
->    and the image saves to your device. A blue Buy Me a Coffee button
->    (matching the site) sits below the buttons. Press Esc to leave picker
+>    and the image saves to your device. Press Esc to leave picker
 >    mode. The website never opens.
 > 4. Share the image anywhere.
 >

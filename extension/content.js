@@ -6,8 +6,7 @@
  *    the page in picker mode — hovering a post card highlights it, clicking
  *    it pops up an options panel right on the page with a live preview and
  *    the same "Show in image" toggles as the website, then Download renders
- *    the PNG. A blue Buy Me a Coffee button sits centered below the panel
- *    buttons. No buttons are injected into posts. Esc cancels.
+ *    the PNG. No buttons are injected into posts. Esc cancels.
  * 2. Post extraction: the payload + DOM extraction the picker (and the
  *    toolbar fallback) uses to build the image.
  *
@@ -901,19 +900,6 @@
     foot.appendChild(dl);
     panel.appendChild(foot);
 
-    // Buy Me a Coffee: the official button, blue to match the site.
-    var bmc = document.createElement("a");
-    bmc.href = "https://www.buymeacoffee.com/masteringrumble";
-    bmc.target = "_blank";
-    bmc.rel = "noopener";
-    bmc.style.cssText = "display:block;margin:16px auto 0;width:217px;";
-    var bmcImg = document.createElement("img");
-    bmcImg.src = "https://cdn.buymeacoffee.com/buttons/v2/default-blue.png";
-    bmcImg.alt = "Buy Me a Coffee";
-    bmcImg.style.cssText =
-      "height:60px !important;width:217px !important;display:block;";
-    bmc.appendChild(bmcImg);
-    panel.appendChild(bmc);
 
     backdrop.appendChild(panel);
     document.body.appendChild(backdrop);
