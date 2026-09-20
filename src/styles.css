@@ -481,3 +481,43 @@ kbd {
     flex: 1 1 auto;
   }
 }
+
+/* DonateButton — drop-in donation button (src/components/DonateButton.tsx).
+   Portable across projects: set --donate-accent to retheme, or let it inherit
+   the host site's --accent. Defaults match this site's light-blue theme. */
+.donate-btn {
+  --_accent: var(--donate-accent, var(--accent, #3eb1f9));
+  --_ink: var(--donate-text, var(--ink, #ffffff));
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 18px;
+  border-radius: 999px;
+  border: 1px solid var(--_accent);
+  background: transparent;
+  color: var(--_accent);
+  font: 600 14px/1.3 "Mulish", system-ui, sans-serif;
+  text-decoration: none;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease, box-shadow 0.15s ease,
+    transform 0.1s ease;
+}
+.donate-btn:hover {
+  background: var(--_accent);
+  color: #08131f;
+  box-shadow: 0 4px 18px rgba(62, 177, 249, 0.35);
+  text-decoration: none;
+}
+.donate-btn:active {
+  transform: translateY(1px);
+}
+.donate-btn svg {
+  flex: none;
+}
+.donate-btn-compact {
+  padding: 6px 14px;
+  font-size: 13px;
+}
+.hero-donate {
+  margin-top: 16px;
+}
