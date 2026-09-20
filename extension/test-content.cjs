@@ -327,7 +327,7 @@ ${feedCard("222222", "bob", "Bob B", "u-bob/b.jpeg", "3 hours ago", "p-222/photo
   });
   delete globalThis.__pickaxPostToImageInjected; // allow re-eval in the test harness
   // Stub the extension API: icon URL for the hint pill + capture the
-  // open-app message the picker sends on click.
+  // render message the panel sends on Download.
   var sentMsgs = [];
   globalThis.chrome = {
     runtime: {
@@ -395,15 +395,41 @@ ${feedCard("222222", "bob", "Bob B", "u-bob/b.jpeg", "3 hours ago", "p-222/photo
   );
   assert.ok(pill, "hint pill shown");
 
-  // Hover card 1 -> click -> open-app message for post 111111, picker exits.
+  // Hover card 1 -> click -> options panel pops up (nothing sent yet).
   const innerBtn = card1.querySelector(".actions button");
   innerBtn.dispatchEvent(
     new domF.window.MouseEvent("mouseover", { bubbles: true })
   );
   await new Promise((r) => setTimeout(r, 40)); // let the rAF hover update run
   innerBtn.dispatchEvent(new domF.window.MouseEvent("click", { bubbles: true }));
-  assert.equal(sentMsgs.length, 1, "one open-app message sent on pick");
-  assert.equal(sentMsgs[0].type, "pickax-post-to-image:open-app");
+  assert.equal(sentMsgs.length, 0, "nothing sent before Download");
+  const panel = docF.getElementById("pickax-post-to-image-panel-backdrop");
+  assert.ok(panel, "options panel shown");
+  // Same toggle visibility as the website: card 1 has images, no link card.
+  const toggleKeys = Array.prototype.map.call(
+    panel.querySelectorAll("[data-ppi-toggle]"),
+    function (el) {
+      return el.getAttribute("data-ppi-toggle");
+    }
+  );
+  assert.deepEqual(
+    toggleKeys,
+    ["showLogo", "showViews", "showMedia", "showEngagement"],
+    "Post images shown (has images), Site embed hidden (no link card)"
+  );
+  assert.equal(
+    docF.documentElement.style.cursor,
+    "",
+    "cursor restored after pick"
+  );
+
+  // Flip "Post images" off, then Download -> render message carries options.
+  const mediaRow = panel.querySelector('[data-ppi-toggle="showMedia"]');
+  mediaRow.querySelector('button[role="switch"]').click();
+  panel.querySelector("[data-ppi-download]").click();
+  await new Promise((r) => setTimeout(r, 30)); // let the sendMessage promise settle
+  assert.equal(sentMsgs.length, 1, "one render message sent on Download");
+  assert.equal(sentMsgs[0].type, "pickax-post-to-image:render");
   assert.equal(sentMsgs[0].payload.postId, "111111", "picked card 1");
   assert.equal(sentMsgs[0].payload.username, "alice", "no cross-card bleed");
   assert.equal(
@@ -411,10 +437,21 @@ ${feedCard("222222", "bob", "Bob B", "u-bob/b.jpeg", "3 hours ago", "p-222/photo
     "Alice post text",
     "payload text extracted for the picked card"
   );
+  assert.deepEqual(
+    sentMsgs[0].options,
+    {
+      showLogo: true,
+      showViews: true,
+      showMedia: false,
+      showLinkCard: true,
+      showEngagement: true,
+    },
+    "options reflect the flipped toggle"
+  );
   assert.equal(
-    docF.documentElement.style.cursor,
-    "",
-    "cursor restored after pick"
+    docF.getElementById("pickax-post-to-image-panel-backdrop"),
+    null,
+    "panel closed after Download"
   );
 
   // Esc cancels picker mode without sending anything.
@@ -464,7 +501,7 @@ ${feedCard("222222", "bob", "Bob B", "u-bob/b.jpeg", "3 hours ago", "p-222/photo
     "card 2 avatar is Bob's, not Alice's"
   );
   assert.deepEqual(f2.imageUrls, ["https://img.pickax.com/p-222/photo.jpeg"]);
-  console.log("ok  content.js picker: highlight, click-to-open-app, Esc, scoped extraction");
+  console.log("ok  content.js picker: highlight, options panel, download with options, Esc");
 })().then(
   () => console.log("\nALL EXTENSION TESTS PASSED"),
   (e) => {

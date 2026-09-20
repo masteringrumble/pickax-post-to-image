@@ -37,9 +37,11 @@
   "manifest_version": 3,
   "name": "Pickax Post to Image",
   "permissions": [
-    "scripting"
+    "scripting",
+    "offscreen",
+    "downloads"
   ],
-  "version": "1.3.0",
+  "version": "1.4.0",
   "web_accessible_resources": [
     {
       "resources": [

@@ -4,9 +4,9 @@
  *
  * 1. Element picker (uBlock Origin style): clicking the toolbar button puts
  *    the page in picker mode — hovering a post card highlights it, clicking
- *    it opens the web app with that post pre-filled (same options as the
- *    website: image toggles, site embed, etc.). No buttons are injected
- *    into posts, no website visit needed. Esc cancels.
+ *    it pops up an options panel right on the page (same "Show in image"
+ *    toggles as the website), then Download renders the PNG. No buttons
+ *    are injected into posts. Esc cancels.
  * 2. Post extraction: the payload + DOM extraction the picker (and the
  *    toolbar fallback) uses to build the image.
  *
@@ -22,7 +22,7 @@
   if (globalThis.__pickaxPostToImageInjected) return;
   globalThis.__pickaxPostToImageInjected = true;
 
-  var OPEN_APP_MSG = "pickax-post-to-image:open-app";
+  var RENDER_MSG = "pickax-post-to-image:render";
 
   // An engagement button (pick / axe / comment): a real page button holding
   // an icon SVG plus a numeric count. Color-agnostic — Pickax restyles these
@@ -640,7 +640,7 @@
       toast("Couldn't read that post.");
       return;
     }
-    openInApp(card, postId);
+    openPanelForCard(card, postId);
   }
 
   function onPickKey(e) {
@@ -650,11 +650,242 @@
     }
   }
 
-  // Picker click: extract the post and open the web app with it pre-filled,
-  // so people get the same options as the website (toggles for images,
-  // site embed, etc.) instead of a blind auto-download.
-  function openInApp(cardRoot, postId) {
-    toast("Opening…");
+  // -------------------------------------------------------------------------
+  // In-extension options panel
+  // -------------------------------------------------------------------------
+  // After picking a post, a panel pops up right on the page with the same
+  // "Show in image" options as the website. Download renders via the
+  // offscreen document and saves the PNG — the site never opens.
+
+  var PANEL_BACKDROP_ID = "pickax-post-to-image-panel-backdrop";
+
+  function paintSwitch(sw, on) {
+    sw.setAttribute("aria-checked", on ? "true" : "false");
+    sw.style.cssText =
+      "width:44px;height:26px;border-radius:9999px;border:none;cursor:pointer;" +
+      "position:relative;flex:none;transition:background .15s;padding:0;" +
+      (on ? "background:#3EB1F9;" : "background:#3a4358;");
+    var k = sw.firstChild;
+    if (!k || k.tagName !== "SPAN") {
+      sw.textContent = "";
+      k = document.createElement("span");
+      sw.appendChild(k);
+    }
+    k.style.cssText =
+      "position:absolute;top:3px;left:" +
+      (on ? "21px" : "3px") +
+      ";width:20px;height:20px;border-radius:50%;background:#fff;" +
+      "transition:left .15s;box-shadow:0 1px 3px rgba(0,0,0,.4);display:block;";
+  }
+
+  function makeSwitch(on, onFlip) {
+    var sw = document.createElement("button");
+    sw.type = "button";
+    sw.setAttribute("role", "switch");
+    paintSwitch(sw, on);
+    sw.addEventListener("click", function (e) {
+      e.stopPropagation();
+      var v = sw.getAttribute("aria-checked") !== "true";
+      paintSwitch(sw, v);
+      onFlip(v);
+    });
+    return sw;
+  }
+
+  function closePanel() {
+    var b = document.getElementById(PANEL_BACKDROP_ID);
+    if (b && b.parentNode) b.parentNode.removeChild(b);
+    document.removeEventListener("keydown", onPanelKey, true);
+  }
+
+  function onPanelKey(e) {
+    if (e.key === "Escape" || e.key === "Esc") {
+      e.preventDefault();
+      e.stopPropagation();
+      closePanel();
+    }
+  }
+
+  function showPanel(payload) {
+    closePanel();
+    // Same options + same visibility rules as the website's "Show in image"
+    // toggles (App.tsx): Logo / Views / Picks & axes always; Post images
+    // only when the post has images or a video; Site embed only when the
+    // post has a link card and no video.
+    var opts = {
+      showLogo: true,
+      showViews: true,
+      showMedia: true,
+      showLinkCard: true,
+      showEngagement: true,
+    };
+    var hasMedia =
+      (payload.imageUrls && payload.imageUrls.length > 0) ||
+      !!payload.videoSrc;
+    var toggles = [
+      { key: "showLogo", label: "Logo", show: true },
+      { key: "showViews", label: "Views", show: true },
+      { key: "showMedia", label: "Post images", show: hasMedia },
+      {
+        key: "showLinkCard",
+        label: "Site embed",
+        show: !!payload.linkCard && !payload.videoSrc,
+      },
+      { key: "showEngagement", label: "Picks & axes", show: true },
+    ];
+
+    var backdrop = document.createElement("div");
+    backdrop.id = PANEL_BACKDROP_ID;
+    backdrop.style.cssText =
+      "position:fixed;inset:0;z-index:2147483647;display:flex;" +
+      "align-items:center;justify-content:center;background:rgba(0,0,0,.65);" +
+      "font-family:system-ui,-apple-system,sans-serif;";
+    backdrop.addEventListener("click", function (e) {
+      if (e.target === backdrop) closePanel();
+    });
+
+    var panel = document.createElement("div");
+    panel.style.cssText =
+      "width:400px;max-width:92vw;max-height:88vh;overflow:auto;" +
+      "background:#141a28;color:#eef2f9;border-radius:16px;" +
+      "border:1px solid rgba(62,177,249,.45);" +
+      "box-shadow:0 24px 70px rgba(0,0,0,.6);padding:20px;";
+
+    // Header
+    var head = document.createElement("div");
+    head.style.cssText =
+      "display:flex;align-items:center;gap:10px;margin-bottom:14px;";
+    var iconUrl =
+      api && api.runtime && api.runtime.getURL
+        ? api.runtime.getURL("icons/icon-32.png")
+        : "";
+    if (iconUrl) {
+      var icon = document.createElement("img");
+      icon.src = iconUrl;
+      icon.alt = "";
+      icon.style.cssText = "width:26px;height:26px;border-radius:6px;";
+      head.appendChild(icon);
+    }
+    var title = document.createElement("div");
+    title.textContent = "Pickax Post to Image";
+    title.style.cssText = "font-size:16px;font-weight:700;flex:1;";
+    head.appendChild(title);
+    var x = document.createElement("button");
+    x.type = "button";
+    x.textContent = "✕";
+    x.setAttribute("aria-label", "Close");
+    x.style.cssText =
+      "background:none;border:none;color:#8b94a9;font-size:16px;cursor:pointer;padding:4px 8px;";
+    x.addEventListener("click", closePanel);
+    head.appendChild(x);
+    panel.appendChild(head);
+
+    // Post summary
+    var sum = document.createElement("div");
+    sum.style.cssText =
+      "display:flex;gap:10px;align-items:flex-start;background:#1b2334;" +
+      "border-radius:12px;padding:12px;margin-bottom:16px;";
+    if (payload.avatarUrl) {
+      var av = document.createElement("img");
+      av.src = payload.avatarUrl;
+      av.alt = "";
+      av.style.cssText =
+        "width:40px;height:40px;border-radius:50%;object-fit:cover;flex:none;";
+      sum.appendChild(av);
+    }
+    var sumText = document.createElement("div");
+    sumText.style.cssText = "min-width:0;";
+    var who = document.createElement("div");
+    who.style.cssText = "font-weight:600;font-size:14px;";
+    who.textContent =
+      (payload.displayName || payload.username || "Post") +
+      (payload.username ? " @" + payload.username : "");
+    sumText.appendChild(who);
+    var snippet = document.createElement("div");
+    snippet.style.cssText =
+      "font-size:13px;color:#aab4c9;margin-top:2px;overflow:hidden;" +
+      "display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;";
+    var t = payload.text || "";
+    snippet.textContent = t.length > 160 ? t.slice(0, 160) + "…" : t;
+    sumText.appendChild(snippet);
+    sum.appendChild(sumText);
+    panel.appendChild(sum);
+
+    // Toggles
+    var legend = document.createElement("div");
+    legend.textContent = "Show in image";
+    legend.style.cssText =
+      "font-size:12px;font-weight:700;letter-spacing:.08em;" +
+      "text-transform:uppercase;color:#8b94a9;margin-bottom:8px;";
+    panel.appendChild(legend);
+    toggles.forEach(function (tg) {
+      if (!tg.show) return;
+      var row = document.createElement("div");
+      row.style.cssText =
+        "display:flex;align-items:center;justify-content:space-between;" +
+        "padding:9px 2px;border-top:1px solid #232c42;";
+      row.setAttribute("data-ppi-toggle", tg.key);
+      var lab = document.createElement("span");
+      lab.textContent = tg.label;
+      lab.style.cssText = "font-size:14px;";
+      row.appendChild(lab);
+      row.appendChild(
+        makeSwitch(opts[tg.key], function (v) {
+          opts[tg.key] = v;
+        })
+      );
+      panel.appendChild(row);
+    });
+
+    // Footer buttons
+    var foot = document.createElement("div");
+    foot.style.cssText = "display:flex;gap:10px;margin-top:18px;";
+    var cancel = document.createElement("button");
+    cancel.type = "button";
+    cancel.textContent = "Cancel";
+    cancel.style.cssText =
+      "flex:1;padding:11px;border-radius:10px;border:1px solid #2c3650;" +
+      "background:transparent;color:#cfd6e6;font-size:14px;font-weight:600;cursor:pointer;";
+    cancel.addEventListener("click", closePanel);
+    foot.appendChild(cancel);
+    var dl = document.createElement("button");
+    dl.type = "button";
+    dl.textContent = "Download PNG";
+    dl.setAttribute("data-ppi-download", "1");
+    dl.style.cssText =
+      "flex:2;padding:11px;border-radius:10px;border:none;background:#3EB1F9;" +
+      "color:#fff;font-size:14px;font-weight:700;cursor:pointer;";
+    dl.addEventListener("click", function () {
+      if (!api || !api.runtime || !api.runtime.sendMessage) {
+        closePanel();
+        toast("Extension context lost — reload the page.");
+        return;
+      }
+      dl.disabled = true;
+      dl.textContent = "Rendering…";
+      dl.style.opacity = ".7";
+      api.runtime
+        .sendMessage({ type: RENDER_MSG, payload: payload, options: opts })
+        .then(function (res) {
+          closePanel();
+          toast(
+            res && res.ok ? "Image downloaded ✓" : "Couldn't generate the image."
+          );
+        })
+        .catch(function () {
+          closePanel();
+          toast("Couldn't generate the image.");
+        });
+    });
+    foot.appendChild(dl);
+    panel.appendChild(foot);
+
+    backdrop.appendChild(panel);
+    document.body.appendChild(backdrop);
+    document.addEventListener("keydown", onPanelKey, true);
+  }
+
+  function openPanelForCard(cardRoot, postId) {
     var payload = null;
     try {
       payload = extractPost(cardRoot, postId);
@@ -665,15 +896,7 @@
       toast("Couldn't read that post.");
       return;
     }
-    if (!api || !api.runtime || !api.runtime.sendMessage) {
-      toast("Extension context lost — reload the page.");
-      return;
-    }
-    api.runtime
-      .sendMessage({ type: OPEN_APP_MSG, payload: payload })
-      .catch(function () {
-        toast("Couldn't open the app.");
-      });
+    showPanel(payload);
   }
 
   function startPicker() {

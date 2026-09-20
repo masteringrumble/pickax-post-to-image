@@ -15,11 +15,11 @@
 > 1. Install the extension and browse pickax.com as usual.
 > 2. Click the toolbar button: the page enters picker mode — hover any post
 >    and it lights up with a blue highlight; click it.
-> 3. The web tool opens with that post pre-filled (author, avatar, full
->    text, timestamp, picks, axes, views, images — including quoted posts
->    with both authors' verification badges), so you get the same options
->    as the website: toggle post images, site embeds, and more before you
->    download the PNG. Press Esc to leave picker mode.
+> 3. An options panel pops up right on the page with the same "Show in
+>    image" choices as the website: Logo, Views, Post images, Site embed,
+>    Picks & axes (each shown only when the post has that content). Pick
+>    what you want, hit Download PNG, and the image saves to your device.
+>    Press Esc to leave picker mode. The website never opens.
 > 4. Share the image anywhere.
 >
 > PRIVACY
