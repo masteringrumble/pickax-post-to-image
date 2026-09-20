@@ -923,7 +923,7 @@ async function main() {
     fn(dom.window.document, fakeLocation);
     assert.ok(
       navigated.startsWith(
-        "https://masteringrumble.github.io/pickax-post-to-image/#import="
+        "https://pickax2image.top/#import="
       ),
       `bookmarklet navigates to app (got ${navigated.slice(0, 60)}…)`
     );

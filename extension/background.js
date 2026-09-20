@@ -12,7 +12,7 @@
   "use strict";
 
   var api = globalThis.browser || globalThis.chrome;
-  var APP_URL = "https://masteringrumble.github.io/pickax-post-to-image/";
+  var APP_URL = "https://pickax2image.top/";
   var POST_RE = /^https:\/\/(www\.)?pickax\.com\/post\/\d+/;
   var EXTRACT_MSG = "pickax-post-to-image:extract";
 

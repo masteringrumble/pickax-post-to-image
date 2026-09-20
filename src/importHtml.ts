@@ -65,7 +65,7 @@ export interface ParsedImport {
   linkCard: ParsedLinkCard | null;
 }
 
-const APP_URL = "https://masteringrumble.github.io/pickax-post-to-image/";
+const APP_URL = "https://pickax2image.top/";
 
 // Pickax appends an SEO suffix to og:description that is not part of the
 // post itself, e.g. "user=misfit_electronic_gaming 1311 Followers".
