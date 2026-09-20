@@ -6,10 +6,12 @@
 
 Pickax Post to Image adds a toolbar button. When you click it while on
 pickax.com, the page enters picker mode: hover any post and it highlights,
-click it, and the extension reads that post (author, avatar, text,
-timestamp, picks, axes, views, images) and renders a shareable PNG image of
-it, downloaded straight to your device. Press Esc to leave picker mode.
-Nothing is injected into posts — no buttons, no page changes.
+click it, and the
+[Pickax Post to Image web tool](https://www.pickax2image.top/)
+opens with that post's details (author, avatar, text, timestamp, counts,
+images) pre-filled, so you can tweak the options and generate a shareable
+image of the post. Press Esc to leave picker mode. Nothing is injected
+into posts — no buttons, no page changes.
 
 ## Data handling
 
@@ -17,9 +19,8 @@ Nothing is injected into posts — no buttons, no page changes.
 - The extension reads a Pickax post **only on your device, only when you
   click a highlighted post in picker mode**. Nothing is read in the
   background.
-- The extracted post data is rendered locally in your browser (offscreen
-  document) into a PNG saved to your downloads. It is never sent anywhere
-  else.
+- The extracted post data is passed to the web tool through the page URL
+  (a `#import=` link opened in a new tab). It is never sent anywhere else.
 - **Nothing is stored** by the extension — no local storage, no cookies, no
   servers, no third parties.
 
@@ -30,8 +31,6 @@ Nothing is injected into posts — no buttons, no page changes.
   the toolbar button.
 - **`scripting`** — fallback that loads the picker if the tab was open
   before the extension was installed.
-- **`offscreen`** — renders the post image in a hidden document.
-- **`downloads`** — saves the generated PNG to your device.
 
 ## Contact
 

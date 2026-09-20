@@ -326,8 +326,8 @@ ${feedCard("222222", "bob", "Bob B", "u-bob/b.jpeg", "3 hours ago", "p-222/photo
     pretendToBeVisual: true, // lets requestAnimationFrame callbacks run
   });
   delete globalThis.__pickaxPostToImageInjected; // allow re-eval in the test harness
-  // Stub the extension API: icon URL for the hint pill + capture the render
-  // message the picker sends on click.
+  // Stub the extension API: icon URL for the hint pill + capture the
+  // open-app message the picker sends on click.
   var sentMsgs = [];
   globalThis.chrome = {
     runtime: {
@@ -395,15 +395,15 @@ ${feedCard("222222", "bob", "Bob B", "u-bob/b.jpeg", "3 hours ago", "p-222/photo
   );
   assert.ok(pill, "hint pill shown");
 
-  // Hover card 1 -> click -> render message for post 111111, picker exits.
+  // Hover card 1 -> click -> open-app message for post 111111, picker exits.
   const innerBtn = card1.querySelector(".actions button");
   innerBtn.dispatchEvent(
     new domF.window.MouseEvent("mouseover", { bubbles: true })
   );
   await new Promise((r) => setTimeout(r, 40)); // let the rAF hover update run
   innerBtn.dispatchEvent(new domF.window.MouseEvent("click", { bubbles: true }));
-  assert.equal(sentMsgs.length, 1, "one render message sent on pick");
-  assert.equal(sentMsgs[0].type, "pickax-post-to-image:render");
+  assert.equal(sentMsgs.length, 1, "one open-app message sent on pick");
+  assert.equal(sentMsgs[0].type, "pickax-post-to-image:open-app");
   assert.equal(sentMsgs[0].payload.postId, "111111", "picked card 1");
   assert.equal(sentMsgs[0].payload.username, "alice", "no cross-card bleed");
   assert.equal(
@@ -464,7 +464,7 @@ ${feedCard("222222", "bob", "Bob B", "u-bob/b.jpeg", "3 hours ago", "p-222/photo
     "card 2 avatar is Bob's, not Alice's"
   );
   assert.deepEqual(f2.imageUrls, ["https://img.pickax.com/p-222/photo.jpeg"]);
-  console.log("ok  content.js picker: highlight, click-to-render, Esc, scoped extraction");
+  console.log("ok  content.js picker: highlight, click-to-open-app, Esc, scoped extraction");
 })().then(
   () => console.log("\nALL EXTENSION TESTS PASSED"),
   (e) => {

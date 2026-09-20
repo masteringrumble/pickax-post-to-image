@@ -4,8 +4,9 @@
  *
  * 1. Element picker (uBlock Origin style): clicking the toolbar button puts
  *    the page in picker mode — hovering a post card highlights it, clicking
- *    it generates the PNG right there and downloads it automatically. No
- *    buttons are injected into posts, no website visit needed. Esc cancels.
+ *    it opens the web app with that post pre-filled (same options as the
+ *    website: image toggles, site embed, etc.). No buttons are injected
+ *    into posts, no website visit needed. Esc cancels.
  * 2. Post extraction: the payload + DOM extraction the picker (and the
  *    toolbar fallback) uses to build the image.
  *
@@ -21,7 +22,7 @@
   if (globalThis.__pickaxPostToImageInjected) return;
   globalThis.__pickaxPostToImageInjected = true;
 
-  var RENDER_MSG = "pickax-post-to-image:render";
+  var OPEN_APP_MSG = "pickax-post-to-image:open-app";
 
   // An engagement button (pick / axe / comment): a real page button holding
   // an icon SVG plus a numeric count. Color-agnostic — Pickax restyles these
@@ -639,7 +640,7 @@
       toast("Couldn't read that post.");
       return;
     }
-    renderCard(card, postId);
+    openInApp(card, postId);
   }
 
   function onPickKey(e) {
@@ -649,8 +650,11 @@
     }
   }
 
-  function renderCard(cardRoot, postId) {
-    toast("Rendering…");
+  // Picker click: extract the post and open the web app with it pre-filled,
+  // so people get the same options as the website (toggles for images,
+  // site embed, etc.) instead of a blind auto-download.
+  function openInApp(cardRoot, postId) {
+    toast("Opening…");
     var payload = null;
     try {
       payload = extractPost(cardRoot, postId);
@@ -666,14 +670,9 @@
       return;
     }
     api.runtime
-      .sendMessage({ type: RENDER_MSG, payload: payload })
-      .then(function (res) {
-        toast(
-          res && res.ok ? "Image downloaded ✓" : "Couldn't generate the image."
-        );
-      })
+      .sendMessage({ type: OPEN_APP_MSG, payload: payload })
       .catch(function () {
-        toast("Couldn't generate the image.");
+        toast("Couldn't open the app.");
       });
   }
 
