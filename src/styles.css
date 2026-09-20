@@ -223,40 +223,6 @@ body {
   margin-top: 20px;
 }
 
-/* Instagram share panel: sits inline in the button row. */
-.share-panel {
-  display: inline-flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 4px;
-  margin-top: 20px;
-}
-.share-panel .btn {
-  margin-top: 0;
-}
-.share-meta {
-  font-size: 0.8rem;
-  color: var(--muted);
-}
-.share-hint {
-  margin: 0;
-  font-size: 0.8rem;
-  color: var(--muted);
-}
-.linklike {
-  background: none;
-  border: none;
-  padding: 0;
-  font: inherit;
-  color: var(--accent);
-  cursor: pointer;
-  text-decoration: underline;
-}
-.share-panel .error,
-.share-panel .notice {
-  margin: 4px 0 0;
-  font-size: 0.85rem;
-}
 
 .error {
   background: var(--error-bg);

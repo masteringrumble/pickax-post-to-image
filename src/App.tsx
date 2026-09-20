@@ -17,7 +17,6 @@ import {
   type ParsedImport,
 } from "./importHtml";
 import { renderPostImage } from "./renderer";
-import SharePanel from "./components/SharePanel";
 import {
   DEFAULT_RENDER_OPTIONS,
   type LoadedImage,
@@ -518,12 +517,6 @@ export default function App() {
     }
   }
 
-  function getPngBlob(): Promise<Blob | null> {
-    const canvas = canvasRef.current;
-    if (!canvas) return Promise.resolve(null);
-    return new Promise((resolve) => canvas.toBlob(resolve, "image/png"));
-  }
-
   function handleDownload() {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -910,7 +903,6 @@ export default function App() {
               <button className="btn primary" onClick={handleDownload}>
                 Download PNG
               </button>
-              <SharePanel getPngBlob={getPngBlob} />
               <button className="btn" onClick={resetAll}>
                 Generate New
               </button>
