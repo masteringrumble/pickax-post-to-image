@@ -987,7 +987,7 @@ export async function renderPostImage(
   ctx.textAlign = "left";
   ctx.fillText(`pickax.com/post/${data.postId}`, cx0, y);
   ctx.textAlign = "right";
-  ctx.fillText("bit.ly/JoinPickaxToday", cx0 + CONTENT_W, y);
+  ctx.fillText("www.pickax2image.top", cx0 + CONTENT_W, y);
   ctx.textAlign = "left";
 
   return canvas;

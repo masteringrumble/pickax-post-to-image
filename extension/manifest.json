@@ -1,1 +1,56 @@
-{"action":{"default_title":"Pickax Post to Image"},"background":{"service_worker":"background.js"},"browser_specific_settings":{"gecko":{"id":"pickax-post-to-image@masteringrumble.github.io","strict_min_version":"121.0"}},"content_scripts":[{"js":["content.js"],"matches":["https://pickax.com/*","https://www.pickax.com/*"],"run_at":"document_idle"}],"description":"Turn any Pickax post into a clean, shareable image — right from the post, no website visit needed.","host_permissions":["https://pickax.com/*","https://www.pickax.com/*"],"icons":{"128":"icons/icon-128.png","16":"icons/icon-16.png","32":"icons/icon-32.png","48":"icons/icon-48.png"},"manifest_version":3,"name":"Pickax Post to Image","permissions":["scripting","offscreen","downloads"],"version":"1.1.1","web_accessible_resources":[{"resources":["icons/icon-32.png"],"matches":["https://pickax.com/*","https://www.pickax.com/*"]}]}
+{
+  "action": {
+    "default_title": "Pickax Post to Image"
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "pickax-post-to-image@masteringrumble.github.io",
+      "strict_min_version": "121.0"
+    }
+  },
+  "content_scripts": [
+    {
+      "js": [
+        "content.js"
+      ],
+      "matches": [
+        "https://pickax.com/*",
+        "https://www.pickax.com/*"
+      ],
+      "run_at": "document_idle"
+    }
+  ],
+  "description": "Turn any Pickax post into a clean, shareable image \u2014 right from the post, no website visit needed.",
+  "host_permissions": [
+    "https://pickax.com/*",
+    "https://www.pickax.com/*"
+  ],
+  "icons": {
+    "128": "icons/icon-128.png",
+    "16": "icons/icon-16.png",
+    "32": "icons/icon-32.png",
+    "48": "icons/icon-48.png"
+  },
+  "manifest_version": 3,
+  "name": "Pickax Post to Image",
+  "permissions": [
+    "scripting",
+    "offscreen",
+    "downloads"
+  ],
+  "version": "1.1.2",
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "icons/icon-32.png"
+      ],
+      "matches": [
+        "https://pickax.com/*",
+        "https://www.pickax.com/*"
+      ]
+    }
+  ]
+}

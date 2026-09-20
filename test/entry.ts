@@ -217,7 +217,7 @@ async function main() {
     assert.ok(texts.some((t: string) => t.includes("Misfit Electronic")), "display name drawn");
     assert.ok(texts.some((t: string) => t === "@misfit_electronic_gaming"), "handle drawn");
     assert.ok(texts.some((t: string) => t === "pickax.com/post/707864"), "source footer drawn");
-    assert.ok(texts.some((t: string) => t === "bit.ly/JoinPickaxToday"), "join link footer drawn");
+    assert.ok(texts.some((t: string) => t === "www.pickax2image.top"), "site link footer drawn");
     assert.ok(
       canvas._ctx.calls.some((c: any) => c[0] === "drawImage" && c[1] === "logo"),
       "supplied logo drawn"
