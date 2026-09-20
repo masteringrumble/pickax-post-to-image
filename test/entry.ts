@@ -18,6 +18,15 @@ import {
 } from "../src/importHtml";
 import { renderPostImage } from "../src/renderer";
 import {
+  captionFitsX,
+  postUrlOf,
+  suggestedPostCaption,
+  titleFitsTruthSocial,
+  truthSocialShareUrl,
+  truthSocialTitle,
+  xIntentUrl,
+} from "../src/share";
+import {
   extractNuxtBlock,
   parseNuxtPostData,
 } from "../src/lib/nuxtPost";
@@ -217,7 +226,7 @@ async function main() {
     assert.ok(texts.some((t: string) => t.includes("Misfit Electronic")), "display name drawn");
     assert.ok(texts.some((t: string) => t === "@misfit_electronic_gaming"), "handle drawn");
     assert.ok(texts.some((t: string) => t === "pickax.com/post/707864"), "source footer drawn");
-    assert.ok(texts.some((t: string) => t === "bit.ly/JoinPickaxToday"), "join link footer drawn");
+    assert.ok(texts.some((t: string) => t === "@pickaxsocial · bit.ly/JoinPickaxToday"), "join link footer drawn");
     assert.ok(
       canvas._ctx.calls.some((c: any) => c[0] === "drawImage" && c[1] === "logo"),
       "supplied logo drawn"
@@ -400,7 +409,10 @@ async function main() {
       text: "minimal", timestamp: "", images: [], engagement: {},
     });
     const texts = canvas._ctx.calls.filter((c: any) => c[0] === "fillText").map((c: any) => c[1]);
-    assert.ok(!texts.some((t: string) => t.startsWith("@")), "no handle invented");
+    assert.ok(
+      !texts.some((t: string) => t.startsWith("@") && !t.includes("@pickaxsocial")),
+      "no handle invented"
+    );
     assert.ok(!texts.some((t: string) => /♡|💬|↻|👁/.test(t)), "no engagement invented");
     assert.ok(texts.some((t: string) => t === "minimal"), "text drawn");
     console.log("ok  missing data omitted, nothing invented");
@@ -790,6 +802,71 @@ async function main() {
         );
       }
       console.log("ok  renderer: link card draws domain + title");
+    }
+
+    // ---- share: suggested captions, intent URLs, footer handle -------------
+    {
+      const data = {
+        postId: "710273",
+        displayName: "Diamond and Silk",
+        text: "Residents in the remote Alaska village of Savoonga are pushing back against Sen. Lisa Murkowski's opposition to the SAVE America Act.",
+      };
+      assert.equal(postUrlOf(data), "https://pickax.com/post/710273");
+      assert.equal(postUrlOf({ postId: "  " }), "", "blank postId -> no URL");
+
+      const caption = suggestedPostCaption(data);
+      assert.ok(caption.includes("Diamond and Silk on Pickax"), "caption credits author + Pickax");
+      assert.ok(caption.includes("https://pickax.com/post/710273"), "caption carries post URL");
+      assert.ok(!caption.includes("@pickaxsocial"), "no @-mention in caption — the tag lives on the image");
+      assert.ok(captionFitsX(caption), `caption fits X (${caption.length} chars)`);
+
+      // A very long post still yields a caption that fits X's 280 chars.
+      const longCaption = suggestedPostCaption({
+        ...data,
+        text: "word ".repeat(500),
+      });
+      assert.ok(captionFitsX(longCaption), `long-post caption fits X (${longCaption.length} chars)`);
+
+      const xUrl = xIntentUrl(caption);
+      assert.ok(xUrl.startsWith("https://x.com/intent/post?text="), "X intent endpoint");
+      assert.equal(
+        decodeURIComponent(xUrl.split("text=")[1]),
+        caption,
+        "caption round-trips through the intent URL"
+      );
+
+      const title = truthSocialTitle(data);
+      assert.ok(title.includes("Diamond and Silk on Pickax"), "truth title credits author");
+      assert.ok(!title.includes("https://pickax.com/post/"), "URL travels in its own param");
+      const tUrl = truthSocialShareUrl(title, postUrlOf(data));
+      assert.ok(tUrl.startsWith("https://truthsocial.com/share?"), "Truth Social endpoint");
+      assert.ok(tUrl.includes("title=") && tUrl.includes("url="), "title + url params");
+      assert.ok(
+        titleFitsTruthSocial(title, postUrlOf(data)),
+        "truth title + url under the 500-char limit"
+      );
+      console.log("ok  share: captions + intent URLs");
+
+      // The exported image itself tags @pickaxsocial in the footer.
+      const canvas: any = await renderPostImage({
+        postId: "710273",
+        displayName: "Diamond and Silk",
+        username: "DiamondandSilk",
+        verified: null,
+        avatar: null,
+        text: "hi",
+        timestamp: "",
+        images: [],
+        engagement: {},
+      });
+      const footerTexts = canvas._ctx.calls
+        .filter((c: any) => c[0] === "fillText")
+        .map((c: any) => c[1]);
+      assert.ok(
+        footerTexts.some((t: string) => t.includes("@pickaxsocial")),
+        "footer tags @pickaxsocial on the image"
+      );
+      console.log("ok  share: footer tags @pickaxsocial");
     }
 
     // Legacy v1 bookmarklets sent verified:true — still honored as gold.
