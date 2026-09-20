@@ -316,6 +316,25 @@ function drawVerifiedBadge(
   drawSvgPath(ctx, BADGE_PATH, 32, x + size / 2, cy, size, color, "evenodd");
 }
 
+// Draw an avatar cover-fit into a square box: the image keeps its aspect
+// ratio and the excess is center-cropped, exactly like pickax.com's
+// object-fit: cover. Never stretches. Square images render as before.
+function drawAvatarCover(
+  ctx: CanvasRenderingContext2D,
+  img: HTMLImageElement,
+  x: number,
+  y: number,
+  size: number
+): void {
+  const iw = img.naturalWidth || img.width;
+  const ih = img.naturalHeight || img.height;
+  if (!iw || !ih) return;
+  const s = Math.max(size / iw, size / ih);
+  const dw = iw * s;
+  const dh = ih * s;
+  ctx.drawImage(img, x + (size - dw) / 2, y + (size - dh) / 2, dw, dh);
+}
+
 function drawPlayButton(
   ctx: CanvasRenderingContext2D,
   cx: number,
@@ -513,7 +532,7 @@ function drawQuoteCard(
   ctx.arc(qcx + Q_AVATAR / 2, qy + Q_AVATAR / 2, Q_AVATAR / 2, 0, Math.PI * 2);
   ctx.clip();
   if (q.avatar) {
-    ctx.drawImage(q.avatar, qcx, qy, Q_AVATAR, Q_AVATAR);
+    drawAvatarCover(ctx, q.avatar, qcx, qy, Q_AVATAR);
   } else {
     ctx.fillStyle = PX.avatarBg;
     ctx.fillRect(qcx, qy, Q_AVATAR, Q_AVATAR);
@@ -761,7 +780,7 @@ export async function renderPostImage(
   ctx.arc(cx0 + AVATAR / 2, y + AVATAR / 2, AVATAR / 2, 0, Math.PI * 2);
   ctx.clip();
   if (data.avatar) {
-    ctx.drawImage(data.avatar, cx0, y, AVATAR, AVATAR);
+    drawAvatarCover(ctx, data.avatar, cx0, y, AVATAR);
   } else {
     ctx.fillStyle = PX.avatarBg;
     ctx.fillRect(cx0, y, AVATAR, AVATAR);

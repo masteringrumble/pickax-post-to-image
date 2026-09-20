@@ -393,6 +393,56 @@ async function main() {
     console.log("ok  image layouts (1 and 3 images, aspect preserved, no crop)");
   }
 
+  // ---- 6b. renderer: non-square avatars are cover-fit, never stretched ----
+  // Regression: Guardian of Gaia's real avatar is a 451x896 portrait and the
+  // renderer squished it into the square box. Cover-fit keeps the aspect
+  // ratio and center-crops the excess (like pickax.com's object-fit: cover);
+  // square avatars render exactly as before.
+  {
+    const tall = new StubImage();
+    tall.naturalWidth = 451;
+    tall.naturalHeight = 896;
+    const wide = new StubImage();
+    wide.naturalWidth = 896;
+    wide.naturalHeight = 451;
+    const square = new StubImage();
+    square.naturalWidth = 200;
+    square.naturalHeight = 200;
+    const canvas: any = await renderPostImage({
+      postId: "6b", displayName: "A", username: "a", verified: null,
+      avatar: tall as unknown as HTMLImageElement,
+      text: "tall avatar", timestamp: "", images: [], engagement: {},
+      quoted: {
+        postId: "6bq", displayName: "Q", username: "q", verified: null,
+        avatar: wide as unknown as HTMLImageElement,
+        text: "wide quoted avatar", timestamp: "",
+      },
+    });
+    // drawImage records: ["drawImage", tag, dx, dy, dw, dh]. The Pickax logo
+    // draws at width 190, so width 104 = main avatar, 80 = quoted avatar.
+    const draws = (canvas as any)._ctx.calls.filter((c: any) => c[0] === "drawImage");
+    const main = draws.filter((c: any) => c[4] === 104);
+    const quoted = draws.filter((c: any) => c[5] === 80);
+    assert.equal(main.length, 1, "main avatar drawn once");
+    assert.equal(quoted.length, 1, "quoted avatar drawn once");
+    assert.ok(Math.abs(main[0][4] - 104) < 0.01 && main[0][5] > 104,
+      `tall avatar cover-fit, not stretched (got ${main[0][4]}x${main[0][5]})`);
+    assert.ok(Math.abs(quoted[0][5] - 80) < 0.01 && quoted[0][4] > 80,
+      `wide avatar cover-fit, not stretched (got ${quoted[0][4]}x${quoted[0][5]})`);
+    const sq: any = await renderPostImage({
+      postId: "6c", displayName: "A", username: "a", verified: null,
+      avatar: square as unknown as HTMLImageElement,
+      text: "square avatar", timestamp: "", images: [], engagement: {},
+    });
+    const sqDraws = (sq as any)._ctx.calls.filter(
+      (c: any) => c[0] === "drawImage" && c[4] === 104
+    );
+    assert.equal(sqDraws.length, 1, "square avatar drawn once");
+    assert.ok(Math.abs(sqDraws[0][4] - 104) < 0.01 && Math.abs(sqDraws[0][5] - 104) < 0.01,
+      "square avatar unchanged at exactly 104x104");
+    console.log("ok  avatars cover-fit: tall/wide cropped, square unchanged, never stretched");
+  }
+
   // ---- 7. renderer: missing data omitted, never invented ---------------------
   {
     const canvas: any = await renderPostImage({
