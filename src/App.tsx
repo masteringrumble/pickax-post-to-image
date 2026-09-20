@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState } from "react";
-import DonateButton from "./components/DonateButton";
 import { extractPostId } from "./pickax";
 import {
   fetchPostFromWorker,
@@ -573,9 +572,6 @@ export default function App() {
           <p className="tagline">
             Turn any Pickax post into a clean, shareable image.
           </p>
-          <div className="hero-donate">
-            <DonateButton url="https://buymeacoffee.com/masteringrumble" />
-          </div>
         </header>
 
         {stage === "url" && (
