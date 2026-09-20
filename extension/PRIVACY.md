@@ -6,7 +6,7 @@
 
 Pickax Post to Image adds a toolbar button. When you click it while viewing
 a public Pickax post (`pickax.com/post/…`), it reads that page and opens the
-[Pickax Post to Image web tool](https://masteringrumble.github.io/pickax-post-to-image/)
+[Pickax Post to Image web tool](https://www.pickax2image.top/)
 with the post's details (author, avatar, text, timestamp, counts, images)
 pre-filled, so you can generate a shareable image of the post.
 
