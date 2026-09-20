@@ -653,7 +653,8 @@ async function main() {
         // 6: quoted post
         id: 708186,
         content: 7,
-        createdAt: "2026-09-19T21:36:00.195Z",
+        // 2.5h ago at runtime: timeAgo stays "2 hours ago" forever.
+        createdAt: new Date(Date.now() - 2.5 * 3600 * 1000).toISOString(),
         user: 8,
       },
       "Quoted <b>body</b> text<br><br>Second para.", // 7: quoted text

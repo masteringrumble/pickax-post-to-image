@@ -171,6 +171,24 @@ body {
   margin-top: 8px;
 }
 
+/* "More ways" expander on the URL stage: a quiet text button, not a CTA. */
+.more-ways {
+  display: block;
+  margin: 18px auto 0;
+  padding: 8px 12px;
+  background: none;
+  border: none;
+  color: var(--muted);
+  font: inherit;
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.more-ways:hover {
+  color: var(--ink);
+}
+
 .btn-row .btn {
   margin-top: 20px;
 }

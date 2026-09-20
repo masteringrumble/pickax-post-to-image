@@ -166,6 +166,9 @@ export default function App() {
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [busy, setBusy] = useState(false);
+  // Collapsed "more ways" section on the URL stage: the page opens showing
+  // only the link box; bookmarklet + paste-source appear on tap.
+  const [showMoreWays, setShowMoreWays] = useState(false);
 
   // manual-entry fields
   const [displayName, setDisplayName] = useState("");
@@ -373,7 +376,7 @@ export default function App() {
     setNotice("");
     const id = extractPostId(url);
     if (!id) {
-      setError("Please enter a valid Pickax post URL, like https://pickax.com/post/707864.");
+      setError("Please enter a valid Pickax post URL, like https://pickax.com/post/######.");
       return;
     }
     setPostId(id);
@@ -525,7 +528,7 @@ export default function App() {
               className="text-input"
               type="url"
               inputMode="url"
-              placeholder="https://pickax.com/post/707864"
+              placeholder="https://pickax.com/post/######"
               value={url}
               onChange={(e) => setUrl(e.target.value)}
               onKeyDown={(e) => {
@@ -545,42 +548,55 @@ export default function App() {
               )}
             </p>
 
-            <div className="divider" aria-hidden="true">
-              <span>other ways in</span>
-            </div>
-
-            <h2 className="fast-title">One-click import</h2>
-            <p className="muted small">
-              Drag this button to your bookmarks bar. Then, while viewing any
-              Pickax post, click it — the post opens here with everything
-              filled in.
-            </p>
-            <a
-              className="btn primary bookmarklet"
-              href={BOOKMARKLET}
-              onClick={(e) => e.preventDefault()}
-              title="Drag me to your bookmarks bar"
+            <button
+              type="button"
+              className="more-ways"
+              aria-expanded={showMoreWays}
+              onClick={() => setShowMoreWays((v) => !v)}
             >
-              📥 Pickax → Image
-            </a>
-
-            <h2 className="fast-title">Or paste the page source</h2>
-            <p className="muted small">
-              Open the post in your browser, press{" "}
-              <kbd>Ctrl</kbd>+<kbd>U</kbd> (Mac: <kbd>⌘</kbd>+<kbd>⌥</kbd>+
-              <kbd>U</kbd>), copy everything, and paste it below:
-            </p>
-            <textarea
-              className="text-input textarea mono"
-              rows={4}
-              value={htmlSource}
-              onChange={(e) => setHtmlSource(e.target.value)}
-              placeholder="Paste the full page source here…"
-              spellCheck={false}
-            />
-            <button className="btn" onClick={handleImportFromHtml}>
-              Import from page source
+              {showMoreWays ? "Fewer ways ▴" : "More ways ▾"}
             </button>
+
+            {showMoreWays && (
+              <>
+                <div className="divider" aria-hidden="true">
+                  <span>other ways in</span>
+                </div>
+
+                <h2 className="fast-title">One-click import</h2>
+                <p className="muted small">
+                  Drag this button to your bookmarks bar. Then, while viewing any
+                  Pickax post, click it — the post opens here with everything
+                  filled in.
+                </p>
+                <a
+                  className="btn primary bookmarklet"
+                  href={BOOKMARKLET}
+                  onClick={(e) => e.preventDefault()}
+                  title="Drag me to your bookmarks bar"
+                >
+                  📥 Pickax → Image
+                </a>
+
+                <h2 className="fast-title">Or paste the page source</h2>
+                <p className="muted small">
+                  Open the post in your browser, press{" "}
+                  <kbd>Ctrl</kbd>+<kbd>U</kbd> (Mac: <kbd>⌘</kbd>+<kbd>⌥</kbd>+
+                  <kbd>U</kbd>), copy everything, and paste it below:
+                </p>
+                <textarea
+                  className="text-input textarea mono"
+                  rows={4}
+                  value={htmlSource}
+                  onChange={(e) => setHtmlSource(e.target.value)}
+                  placeholder="Paste the full page source here…"
+                  spellCheck={false}
+                />
+                <button className="btn" onClick={handleImportFromHtml}>
+                  Import from page source
+                </button>
+              </>
+            )}
           </section>
         )}
 
