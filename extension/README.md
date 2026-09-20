@@ -26,8 +26,11 @@ Picks & axes — shown only when the post has that content). The preview
 re-renders as toggles flip (remote images are cached, so flips are instant).
 Download renders the final PNG via the offscreen document and saves it with
 chrome.downloads. Everything happens inside the extension; the site never
-opens. Esc cancels. No buttons are injected into posts. On non-Pickax pages
-the toolbar button just opens the web app.
+opens. Esc cancels. No buttons are injected into posts. While the options
+panel is open, a floating Buy Me a Coffee button (blue #3eb1f9 circle with a
+white cup, matching the site's widget) sits at the bottom-right and opens
+https://www.buymeacoffee.com/masteringrumble in a new tab. On non-Pickax
+pages the toolbar button just opens the web app.
 
 ## Test
 

@@ -425,6 +425,20 @@ ${feedCard("222222", "bob", "Bob B", "u-bob/b.jpeg", "3 hours ago", "p-222/photo
   assert.equal(sentMsgs[0].payload.postId, "111111", "picked card 1");
   const panel = docF.getElementById("pickax-post-to-image-panel-backdrop");
   assert.ok(panel, "options panel shown");
+
+  // Buy Me a Coffee: floating blue button (matches the site's widget).
+  const bmc = docF.querySelector('a[title="Buy me a coffee"]');
+  assert.ok(bmc, "BMC floating button shown with the panel");
+  assert.equal(
+    bmc.getAttribute("href"),
+    "https://www.buymeacoffee.com/masteringrumble",
+    "BMC link"
+  );
+  assert.equal(bmc.getAttribute("target"), "_blank", "BMC opens in a new tab");
+  assert.ok(
+    bmc.style.background.indexOf("62, 177, 249") !== -1, // #3eb1f9
+    "BMC matches the site's blue"
+  );
   // Same toggle visibility as the website: card 1 has images, no link card.
   const toggleKeys = Array.prototype.map.call(
     panel.querySelectorAll("[data-ppi-toggle]"),
@@ -487,6 +501,11 @@ ${feedCard("222222", "bob", "Bob B", "u-bob/b.jpeg", "3 hours ago", "p-222/photo
     docF.getElementById("pickax-post-to-image-panel-backdrop"),
     null,
     "panel closed after Download"
+  );
+  assert.equal(
+    docF.querySelector('a[title="Buy me a coffee"]'),
+    null,
+    "BMC button removed with the panel"
   );
 
   // Esc cancels picker mode without sending anything.
