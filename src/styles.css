@@ -481,13 +481,3 @@ kbd {
     flex: 1 1 auto;
   }
 }
-
-/* ShareThis sticky sidebar: paint the buttons the site's light-blue accent. */
-.sharethis-share-buttons .st-btn {
-  background-color: #3eb1f9 !important;
-  border-color: #3eb1f9 !important;
-}
-.sharethis-share-buttons .st-btn:hover {
-  background-color: #6cc4fb !important;
-  border-color: #6cc4fb !important;
-}
