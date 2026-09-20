@@ -1,13 +1,16 @@
 /* Pickax Post to Image — content script.
  *
- * Runs on https://pickax.com/post/* pages. Extracts the visible post into the
- * same payload shape the web app's #import= hash accepts, so the toolbar
- * button can open the app with everything pre-filled (author, avatar, full
- * text, timestamp, picks, axes, views, images, and quoted posts).
+ * Runs on https://pickax.com/* pages. Two jobs:
  *
- * Privacy: nothing leaves the browser except when you click the toolbar
- * button, which opens the tool with the extracted post in the URL hash.
- * No accounts, no analytics, no background transmission.
+ * 1. Per-post "Make image" buttons: while scrolling the feed (or viewing a
+ *    post page), every post card gets a small "Image" button in its action
+ *    row. Clicking it extracts that post and generates the PNG right there —
+ *    no need to open the website. The PNG downloads automatically.
+ * 2. Toolbar-button support: answers the "extract" message the toolbar
+ *    button sends on post pages, so it can open the web app pre-filled.
+ *
+ * Privacy: nothing leaves the browser except the post data you explicitly
+ * turn into an image. No accounts, no analytics, no background transmission.
  */
 (function () {
   "use strict";
@@ -17,6 +20,12 @@
   // re-injects this file into a tab that already has it).
   if (globalThis.__pickaxPostToImageInjected) return;
   globalThis.__pickaxPostToImageInjected = true;
+
+  var EXTRACT_MSG = "pickax-post-to-image:extract";
+  var RENDER_MSG = "pickax-post-to-image:render";
+  var SEEN_ANCHOR = "data-ppi-seen";
+  var SCANNED_ROOT = "data-ppi-scanned";
+  var BTN_ATTR = "data-ppi-btn";
 
   function cleanText(s) {
     return String(s || "")
@@ -96,24 +105,31 @@
     return v;
   }
 
-  function extractPost() {
-    var d = document;
+  // Extract the visible post into the payload shape the renderer accepts.
+  // root: scope DOM queries to one post card (feed) or the whole document
+  //   (post page). The __NUXT_DATA__ payload walk stays global — posts are
+  //   matched by id, so it works for any card on the page.
+  // postIdOverride: the card's post id (feed cards); on post pages it comes
+  //   from the URL.
+  function extractPost(root, postIdOverride) {
+    var d = root || document;
+    var isPage = !root || root === document || root === document.documentElement;
     function q(s) {
       return d.querySelector(s);
     }
+    function qa(s) {
+      return d.querySelectorAll(s);
+    }
     function meta(p) {
-      var e = q('meta[property="' + p + '"]');
+      var e = document.querySelector('meta[property="' + p + '"]');
       return e ? e.getAttribute("content") || "" : "";
     }
 
     var o = {
       v: 6,
-      postId: "",
-      displayName: (meta("og:title") || "").replace(/\s+posted\s*$/i, ""),
-      text: (meta("og:description") || "").replace(
-        /\s*user=\S+\s+[\d,]+\s+Followers\s*$/i,
-        ""
-      ),
+      postId: postIdOverride || "",
+      displayName: "",
+      text: "",
       username: "",
       verified: "",
       avatarUrl: "",
@@ -129,16 +145,29 @@
       q: null,
     };
 
+    // Page-level defaults (post pages only): og tags describe the post.
+    // On feed pages the og tags describe the site, so card posts skip them
+    // and rely on the payload walk + card-scoped DOM below.
+    if (isPage) {
+      o.displayName = (meta("og:title") || "").replace(/\s+posted\s*$/i, "");
+      o.text = (meta("og:description") || "").replace(
+        /\s*user=\S+\s+[\d,]+\s+Followers\s*$/i,
+        ""
+      );
+      var pm0 = location.pathname.match(/\/post\/(\d+)/);
+      if (pm0 && !o.postId) o.postId = pm0[1];
+    }
+
     // Author row: the @username link; the verification seal sits beside the
     // display-name link (same href, non-@ text) in the header container.
-    Array.prototype.forEach.call(d.querySelectorAll('a[href^="/"]'), function (a) {
+    Array.prototype.forEach.call(qa('a[href^="/"]'), function (a) {
       var t = (a.textContent || "").trim();
       if (t.charAt(0) === "@" && t.length > 1) {
         if (!o.username) o.username = t.slice(1).trim();
         if (!o.verified) {
           var dn = null;
           Array.prototype.forEach.call(
-            d.querySelectorAll('a[href="' + a.getAttribute("href") + '"]'),
+            qa('a[href="' + a.getAttribute("href") + '"]'),
             function (x) {
               var xt = (x.textContent || "").trim();
               if (xt && xt.charAt(0) !== "@" && !dn) dn = x;
@@ -165,16 +194,13 @@
     var av = null;
     if (o.username) {
       var authorHref = "/" + o.username.toLowerCase();
-      Array.prototype.forEach.call(
-        d.querySelectorAll('a[href^="/"]'),
-        function (a) {
-          if (av) return;
-          if ((a.getAttribute("href") || "").toLowerCase() !== authorHref)
-            return;
-          var im = a.querySelector('img.rounded-full[src*="img.pickax.com"]');
-          if (im) av = im;
-        }
-      );
+      Array.prototype.forEach.call(qa('a[href^="/"]'), function (a) {
+        if (av) return;
+        if ((a.getAttribute("href") || "").toLowerCase() !== authorHref)
+          return;
+        var im = a.querySelector('img.rounded-full[src*="img.pickax.com"]');
+        if (im) av = im;
+      });
     }
     if (!av) av = q('img.rounded-full[src*="img.pickax.com"]');
     if (av) o.avatarUrl = av.src;
@@ -185,7 +211,9 @@
       if (vm) o.views = vm[1];
     }
 
-    Array.prototype.forEach.call(d.querySelectorAll("button"), function (b) {
+    Array.prototype.forEach.call(qa("button"), function (b) {
+      // Skip our own injected button.
+      if (b.hasAttribute && b.hasAttribute(BTN_ATTR)) return;
       var h = b.innerHTML || "",
         t = (b.textContent || "").trim(),
         m = t.match(/(\d[\d,]*)/);
@@ -198,7 +226,10 @@
       o.videoSrc = fr.src || "";
       o.videoTitle = fr.getAttribute("title") || "";
     }
-    var thm = d.documentElement.innerHTML.match(
+    var htmlForThumb = isPage
+      ? document.documentElement.innerHTML
+      : d.innerHTML || "";
+    var thm = htmlForThumb.match(
       /https:\/\/[a-z0-9.-]+\.cdn\.rumble\.cloud\/[^"\\\s'<>]+\.(?:jpg|jpeg|png|webp)/i
     );
     if (thm) o.videoThumb = thm[0];
@@ -208,7 +239,7 @@
     // Link card preview images (img.pickax.com/metadata/...) are excluded
     // too: they belong to the link card, not the post's own attached images.
     o.imageUrls = Array.prototype.filter.call(
-      d.querySelectorAll('img[src*="img.pickax.com"]'),
+      qa('img[src*="img.pickax.com"]'),
       function (img) {
         var s = img.src || "";
         return (
@@ -226,7 +257,7 @@
     // Link card DOM fallback (only when the payload didn't provide one):
     // div[title] wrapping an http anchor around a metadata/ preview image.
     function extractLinkCardDOM() {
-      var divs = d.querySelectorAll("div[title]"),
+      var divs = qa("div[title]"),
         found = null;
       Array.prototype.forEach.call(divs, function (cd) {
         if (found) return;
@@ -264,11 +295,8 @@
       return found;
     }
 
-    var pm = location.pathname.match(/\/post\/(\d+)/);
-    if (pm) o.postId = pm[1];
-
     // Full post body from the page payload (og:description is truncated).
-    var nd = d.getElementById("__NUXT_DATA__");
+    var nd = document.getElementById("__NUXT_DATA__");
     if (nd && o.postId) {
       try {
         var A = JSON.parse(nd.textContent || "");
@@ -374,9 +402,206 @@
   // Exposed for the Node smoke test (harmless in production).
   globalThis.__pickaxExtractPost = extractPost;
 
+  // -------------------------------------------------------------------------
+  // Per-post "Make image" buttons
+  // -------------------------------------------------------------------------
+
+  function postIdFromAnchor(a) {
+    var m = (a.getAttribute("href") || "").match(/\/post\/(\d+)/);
+    return m ? m[1] : "";
+  }
+
+  // The post card is the smallest ancestor of the post link that holds the
+  // engagement buttons (pick "0083f5" / axe "dc1919" path colors). Walking up
+  // from the link, the first such ancestor is the card — never the feed.
+  function findCardRoot(anchor) {
+    var el = anchor.parentElement;
+    for (var i = 0; i < 12 && el && el !== document.body; i++) {
+      var hasEng = false;
+      var btns = el.querySelectorAll("button");
+      for (var b = 0; b < btns.length; b++) {
+        var h = btns[b].innerHTML || "";
+        if (h.indexOf("0083f5") > -1 || h.indexOf("dc1919") > -1) {
+          hasEng = true;
+          break;
+        }
+      }
+      if (hasEng) return el;
+      el = el.parentElement;
+    }
+    return document.documentElement;
+  }
+
+  function toast(msg) {
+    var t = document.createElement("div");
+    t.textContent = msg;
+    t.style.cssText =
+      "position:fixed;left:50%;bottom:28px;transform:translateX(-50%);" +
+      "background:#1B2334;color:#fff;font-size:14px;padding:10px 18px;" +
+      "border-radius:9999px;border:1px solid #3A4358;z-index:2147483647;" +
+      "font-family:system-ui,sans-serif;box-shadow:0 4px 16px rgba(0,0,0,.5);";
+    document.body.appendChild(t);
+    setTimeout(function () {
+      t.style.transition = "opacity .4s";
+      t.style.opacity = "0";
+      setTimeout(function () {
+        t.remove();
+      }, 450);
+    }, 2600);
+  }
+
+  function onMakeImage(postId, cardRoot, btn) {
+    var old = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = "Rendering…";
+    var payload = null;
+    try {
+      payload = extractPost(cardRoot, postId);
+    } catch (e) {
+      payload = null;
+    }
+    function done(msg) {
+      btn.disabled = false;
+      btn.textContent = old;
+      if (msg) toast(msg);
+    }
+    if (!payload || !payload.postId) {
+      done("Couldn't read that post.");
+      return;
+    }
+    if (!api || !api.runtime || !api.runtime.sendMessage) {
+      done("Extension context lost — reload the page.");
+      return;
+    }
+    api.runtime
+      .sendMessage({ type: RENDER_MSG, payload: payload })
+      .then(function (res) {
+        done(res && res.ok ? "Image downloaded ✓" : "Couldn't generate the image.");
+      })
+      .catch(function () {
+        done("Couldn't generate the image.");
+      });
+  }
+
+  function injectButton(cardRoot, postId) {
+    if (cardRoot.querySelector("[" + BTN_ATTR + "]")) return;
+    var btn = document.createElement("button");
+    btn.setAttribute(BTN_ATTR, postId);
+    btn.type = "button";
+    btn.title = "Turn this post into a PNG image";
+    btn.textContent = "📷 Image";
+    btn.style.cssText =
+      "margin-left:8px;padding:3px 10px;border-radius:9999px;flex:none;" +
+      "border:1px solid #3A4358;background:#333D52;color:#fff;" +
+      "font-size:12px;line-height:1.6;cursor:pointer;font-family:inherit;";
+    btn.addEventListener("mouseenter", function () {
+      btn.style.background = "#3EB1F9";
+      btn.style.borderColor = "#3EB1F9";
+    });
+    btn.addEventListener("mouseleave", function () {
+      btn.style.background = "#333D52";
+      btn.style.borderColor = "#3A4358";
+    });
+    btn.addEventListener("click", function (e) {
+      e.preventDefault();
+      e.stopPropagation();
+      onMakeImage(postId, cardRoot, btn);
+    });
+
+    // Park it in the action row: after the last engagement button.
+    var target = null;
+    var btns = cardRoot.querySelectorAll("button");
+    for (var i = btns.length - 1; i >= 0; i--) {
+      var b = btns[i];
+      if (b.hasAttribute(BTN_ATTR)) continue;
+      var h = b.innerHTML || "";
+      if (
+        h.indexOf("0083f5") > -1 ||
+        h.indexOf("dc1919") > -1 ||
+        h.indexOf("17.3333 21") > -1 || // share
+        h.indexOf("7.75776 6.572") > -1 // comment
+      ) {
+        target = b.parentElement;
+        break;
+      }
+    }
+    if (target) target.appendChild(btn);
+    else cardRoot.appendChild(btn);
+  }
+
+  // Group post links by card; the first link (document order) that maps to a
+  // new card defines that card's post id — the outer post's timestamp link
+  // always precedes any quoted-post links inside the card.
+  function scan() {
+    var anchors = document.querySelectorAll(
+      'a[href*="/post/"]:not([' + SEEN_ANCHOR + "])"
+    );
+    Array.prototype.forEach.call(anchors, function (a) {
+      a.setAttribute(SEEN_ANCHOR, "1");
+      var postId = postIdFromAnchor(a);
+      if (!postId) return;
+      var root = findCardRoot(a);
+      // Couldn't scope to a card — don't spray buttons on the page.
+      if (!root || root === document.documentElement) return;
+      if (root.hasAttribute && root.hasAttribute(SCANNED_ROOT)) return;
+      if (root.setAttribute) root.setAttribute(SCANNED_ROOT, "1");
+      try {
+        injectButton(root, postId);
+      } catch (e) {
+        /* never break the page */
+      }
+    });
+  }
+
+  var scanTimer = null;
+  function scheduleScan() {
+    if (scanTimer) return;
+    scanTimer = setTimeout(function () {
+      scanTimer = null;
+      try {
+        scan();
+      } catch (e) {
+        /* never break the page */
+      }
+    }, 400);
+  }
+
+  if (document.body) {
+    try {
+      scan();
+    } catch (e) {
+      /* never break the page */
+    }
+    // MutationObserver covers infinite scroll + SPA navigation. Guarded for
+    // non-browser runtimes (e.g. the jsdom smoke test).
+    if (typeof MutationObserver !== "undefined") {
+      var mo = new MutationObserver(function (muts) {
+        for (var i = 0; i < muts.length; i++) {
+          if (muts[i].addedNodes && muts[i].addedNodes.length) {
+            scheduleScan();
+            break;
+          }
+        }
+      });
+      mo.observe(document.body, { childList: true, subtree: true });
+    }
+  } else {
+    document.addEventListener("DOMContentLoaded", function () {
+      try {
+        scan();
+      } catch (e) {
+        /* never break the page */
+      }
+    });
+  }
+
+  // -------------------------------------------------------------------------
+  // Toolbar-button support (existing behavior)
+  // -------------------------------------------------------------------------
+
   if (api && api.runtime && api.runtime.onMessage) {
     api.runtime.onMessage.addListener(function (msg) {
-      if (msg && msg.type === "pickax-post-to-image:extract") {
+      if (msg && msg.type === EXTRACT_MSG) {
         try {
           return Promise.resolve(extractPost());
         } catch (e) {

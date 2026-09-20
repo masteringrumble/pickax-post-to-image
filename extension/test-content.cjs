@@ -251,4 +251,88 @@ console.log("ok  content.js extraction (quote post, badges, no-image rule)");
   );
   console.log("ok  content.js extracts the link card (attachments vs link image)");
 }
+
+// Feed page: two post cards. Each card gets exactly one "Image" button with
+// its own post id, and card-scoped extraction must not bleed data between
+// cards (author, picks, images stay with their own post).
+{
+  const nuxtFeed = JSON.stringify([
+    { feed: [1, 4] }, // 0
+    { id: 111111, content: 2, user: 3 }, // 1
+    "Alice post text", // 2
+    { fullname: "Alice A", username: "alice", avatar: "u-alice/a.jpeg" }, // 3
+    { id: 222222, content: 5, user: 6 }, // 4
+    "Bob post text", // 5
+    { fullname: "Bob B", username: "bob", avatar: "u-bob/b.jpeg" }, // 6
+  ]);
+  function feedCard(id, user, name, av, text, picks, axes, img) {
+    return `<div class="card" id="card-${id}">
+<div><a href="/${user}">${name}</a></div>
+<div><a href="/${user}">@${user}</a><span title="Sep 20, 2026">${text}</span></div>
+<a href="/${user}"><img src="https://img.pickax.com/${av}" class="rounded-full"></a>
+<a href="/post/${id}">2 hours ago</a>
+<img src="https://img.pickax.com/${img}" alt="post image">
+<div class="actions">
+<button><svg><stop stop-color="#0083f5"/></svg><span>${picks}</span></button>
+<button><svg><stop stop-color="#dc1919"/></svg><span>${axes}</span></button>
+</div>
+</div>`;
+  }
+  const htmlFeed = `<!DOCTYPE html><html><head>
+<meta property="og:title" content="Pickax">
+</head><body>
+<div id="feed">
+${feedCard("111111", "alice", "Alice A", "u-alice/a.jpeg", "2 hours ago", "5", "1", "p-111/photo.jpeg")}
+${feedCard("222222", "bob", "Bob B", "u-bob/b.jpeg", "3 hours ago", "9", "0", "p-222/photo.jpeg")}
+</div>
+<script id="__NUXT_DATA__" type="application/json">${nuxtFeed}</script>
+</body></html>`;
+  const domF = new JSDOM(htmlFeed, { url: "https://pickax.com/" });
+  delete globalThis.__pickaxPostToImageInjected; // allow re-eval in the test harness
+  const factoryF = new domF.window.Function(
+    "document",
+    "location",
+    src + "\nreturn globalThis.__pickaxExtractPost;"
+  );
+  const extractF = factoryF(domF.window.document, domF.window.location);
+
+  // The content script auto-scans on load: one button per card.
+  const btns = domF.window.document.querySelectorAll("[data-ppi-btn]");
+  assert.equal(btns.length, 2, "one Image button per feed card");
+  const btnIds = Array.prototype.map
+    .call(btns, function (b) {
+      return b.getAttribute("data-ppi-btn");
+    })
+    .sort();
+  assert.deepEqual(btnIds, ["111111", "222222"], "buttons carry their card's post id");
+
+  // Scoped extraction: no cross-card bleed.
+  const card1 = domF.window.document.getElementById("card-111111");
+  const card2 = domF.window.document.getElementById("card-222222");
+  const f1 = extractF(card1, "111111");
+  const f2 = extractF(card2, "222222");
+  assert.equal(f1.postId, "111111");
+  assert.equal(f1.username, "alice");
+  assert.equal(f1.displayName, "Alice A");
+  assert.equal(f1.text, "Alice post text");
+  assert.equal(f1.picks, "5");
+  assert.equal(f1.axes, "1");
+  assert.equal(
+    f1.avatarUrl,
+    "https://img.pickax.com/u-alice/a.jpeg",
+    "card 1 avatar is Alice's"
+  );
+  assert.deepEqual(f1.imageUrls, ["https://img.pickax.com/p-111/photo.jpeg"]);
+  assert.equal(f2.postId, "222222");
+  assert.equal(f2.username, "bob");
+  assert.equal(f2.text, "Bob post text");
+  assert.equal(f2.picks, "9");
+  assert.equal(
+    f2.avatarUrl,
+    "https://img.pickax.com/u-bob/b.jpeg",
+    "card 2 avatar is Bob's, not Alice's"
+  );
+  assert.deepEqual(f2.imageUrls, ["https://img.pickax.com/p-222/photo.jpeg"]);
+  console.log("ok  content.js feed cards: per-post buttons + scoped extraction");
+}
 console.log("\nALL EXTENSION TESTS PASSED");

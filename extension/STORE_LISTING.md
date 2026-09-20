@@ -5,25 +5,30 @@
 **Name:** Pickax Post to Image
 
 **Tagline / short description (≤132 chars):**
-> One click turns any Pickax post into a clean, shareable image.
+> Turn any Pickax post into a clean, shareable image — right from the post itself.
 
 **Detailed description:**
 > Pickax Post to Image converts any public Pickax post into a polished,
 > shareable image that matches the look of Pickax itself.
 >
 > HOW IT WORKS
-> 1. Open any post on pickax.com.
-> 2. Click the Pickax Post to Image toolbar button.
-> 3. The post opens in the web tool with the author, avatar, full text,
->    timestamp, picks, axes, views, and images already filled in —
->    including quoted posts with both authors' verification badges.
-> 4. Download the PNG and share it anywhere.
+> 1. Install the extension and browse pickax.com as usual.
+> 2. Every post gets a small "📷 Image" button in its action row — in your
+>    feed and on post pages.
+> 3. Click it: the post is captured (author, avatar, full text, timestamp,
+>    picks, axes, views, images — including quoted posts with both authors'
+>    verification badges) and the PNG downloads automatically. No website
+>    visit needed.
+> 4. Share the image anywhere.
+>
+> Prefer the web tool? The toolbar button still opens any post in the web
+> app with everything pre-filled.
 >
 > PRIVACY
-> No accounts, no analytics, no tracking. The extension reads the post page
-> only on your device and only when you click the button; the extracted post
-> is passed to the web tool through the page URL. Nothing is stored or sent
-> anywhere else.
+> No accounts, no analytics, no tracking. The extension reads the post only
+> on your device and only when you click the button; the image is rendered
+> locally in your browser and saved to your downloads. Nothing is stored
+> or sent anywhere else.
 >
 > The companion web tool is free and open source:
 > https://github.com/masteringrumble/pickax-post-to-image
