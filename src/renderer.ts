@@ -530,7 +530,7 @@ export async function renderPostImage(
   // ---- shared-website link card -------------------------------------------
   // pickax.com renders it below the post images: the link's preview image
   // (aspect-video, cover), then the bare domain and the link title.
-  const linkCard = o.showMedia ? (data.linkCard ?? null) : null;
+  const linkCard = o.showLinkCard ? (data.linkCard ?? null) : null;
   const LINK_PAD = 32; // card p-3 at our scale
   const LINK_TEXT_PAD = 21; // the inner p-2 around domain + title
   const LINK_RADIUS = 32;

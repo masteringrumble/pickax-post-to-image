@@ -94,6 +94,8 @@ export interface RenderOptions {
   showLogo: boolean;
   showViews: boolean;
   showMedia: boolean;
+  /** The shared-website link card (site embed): preview image + domain + title. */
+  showLinkCard: boolean;
   showEngagement: boolean;
 }
 
@@ -101,5 +103,6 @@ export const DEFAULT_RENDER_OPTIONS: RenderOptions = {
   showLogo: true,
   showViews: true,
   showMedia: true,
+  showLinkCard: true,
   showEngagement: true,
 };

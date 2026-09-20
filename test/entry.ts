@@ -792,6 +792,67 @@ async function main() {
       console.log("ok  renderer: link card draws domain + title");
     }
 
+    // The "Post images" toggle hides only the post's own images; the
+    // "Site embed" toggle hides the whole link card (preview image + all
+    // site text). The two are independent.
+    {
+      const mkImg = (w: number, h: number) => {
+        const im = new StubImage();
+        im.naturalWidth = w;
+        im.naturalHeight = h;
+        return { img: im as unknown as HTMLImageElement, width: w, height: h };
+      };
+      const dataWithBoth = {
+        postId: "710273",
+        displayName: "Diamond and Silk",
+        username: "DiamondandSilk",
+        verified: null,
+        avatar: null,
+        text: "Residents are pushing back.",
+        timestamp: "",
+        images: [mkImg(1600, 900)],
+        engagement: {},
+        linkCard: {
+          url: "https://trendingpoliticsnews.com/rural-alaskans-push-back/",
+          domain: "trendingpoliticsnews.com",
+          title: "Rural Alaskans Push Back On Murkowski's SAVE America Act Warning",
+          description: "",
+          image: null,
+        },
+      };
+      const allOpts = {
+        showEngagement: false, showViews: false, showMedia: true,
+        showLinkCard: true, showLogo: false,
+      };
+      const postImgDrawn = (canvas: any) =>
+        canvas._ctx.calls.some(
+          (c: any) => c[0] === "drawImage" && c[1] === "img" && c[4] > 200
+        );
+      const linkTextDrawn = (canvas: any) =>
+        canvas._ctx.calls
+          .filter((c: any) => c[0] === "fillText")
+          .some((c: any) => c[1] === "trendingpoliticsnews.com");
+
+      const both: any = await renderPostImage(dataWithBoth, allOpts);
+      assert.ok(postImgDrawn(both), "baseline: post image drawn");
+      assert.ok(linkTextDrawn(both), "baseline: link card text drawn");
+
+      // Hiding post images leaves the site embed untouched.
+      const noMedia: any = await renderPostImage(dataWithBoth, {
+        ...allOpts, showMedia: false,
+      });
+      assert.ok(!postImgDrawn(noMedia), "showMedia=false hides the post image");
+      assert.ok(linkTextDrawn(noMedia), "showMedia=false keeps the site embed");
+
+      // Hiding the site embed removes its text and leaves post images alone.
+      const noLink: any = await renderPostImage(dataWithBoth, {
+        ...allOpts, showLinkCard: false,
+      });
+      assert.ok(postImgDrawn(noLink), "showLinkCard=false keeps the post image");
+      assert.ok(!linkTextDrawn(noLink), "showLinkCard=false removes all site text");
+      console.log("ok  site-embed toggle is independent of the post-images toggle");
+    }
+
     // Legacy v1 bookmarklets sent verified:true — still honored as gold.
     {
       const legacy = {
@@ -1103,7 +1164,7 @@ async function main() {
           timestamp: "2 hours ago",
         },
       },
-      { showEngagement: true, showViews: true, showMedia: true, showLogo: false }
+      { showEngagement: true, showViews: true, showMedia: true, showLinkCard: true, showLogo: false }
     );
     assert.ok(canvas.width > 0 && canvas.height > 0, "quoted card renders");
     // The quoted text must be drawn (fillText called with it).
@@ -1130,7 +1191,7 @@ async function main() {
         engagement: { picks: "0", axes: "0", views: "0" },
         video: null,
       },
-      { showEngagement: true, showViews: false, showMedia: true, showLogo: false }
+      { showEngagement: true, showViews: false, showMedia: true, showLinkCard: true, showLogo: false }
     );
     assert.ok(canvas.width > 0, "zero-count row renders");
     console.log("ok  zero picks/axes show icon only (no number)");

@@ -209,6 +209,9 @@ export default function App() {
 
   const [previewUrl, setPreviewUrl] = useState("");
   const [options, setOptions] = useState<RenderOptions>(DEFAULT_RENDER_OPTIONS);
+  // The post currently shown in the preview stage; drives which toggles are
+  // offered (e.g. "Site embed" only appears when the post has a link card).
+  const [previewData, setPreviewData] = useState<PostData | null>(null);
   const [htmlSource, setHtmlSource] = useState("");
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const dataRef = useRef<PostData | null>(null);
@@ -246,6 +249,7 @@ export default function App() {
     setHtmlSource("");
     canvasRef.current = null;
     dataRef.current = null;
+    setPreviewData(null);
   }
 
   async function renderAndPreview(
@@ -253,6 +257,7 @@ export default function App() {
     opts: RenderOptions = DEFAULT_RENDER_OPTIONS
   ) {
     dataRef.current = data;
+    setPreviewData(data);
     setOptions(opts);
     const canvas = await renderPostImage(data, opts);
     canvasRef.current = canvas;
@@ -882,9 +887,16 @@ export default function App() {
               <label className="toggle">
                 <input type="checkbox" {...toggle("showViews")} /> Views
               </label>
-              <label className="toggle">
-                <input type="checkbox" {...toggle("showMedia")} /> Post images
-              </label>
+              {previewData && (previewData.images.length > 0 || previewData.video != null) && (
+                <label className="toggle">
+                  <input type="checkbox" {...toggle("showMedia")} /> Post images
+                </label>
+              )}
+              {previewData?.linkCard && (
+                <label className="toggle">
+                  <input type="checkbox" {...toggle("showLinkCard")} /> Site embed
+                </label>
+              )}
               <label className="toggle">
                 <input type="checkbox" {...toggle("showEngagement")} /> Picks &amp; axes
               </label>
