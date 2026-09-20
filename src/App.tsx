@@ -18,25 +18,6 @@ import {
 } from "./importHtml";
 import { renderPostImage } from "./renderer";
 import {
-  InstagramIcon,
-  SnapchatIcon,
-  TruthSocialIcon,
-  XIcon,
-} from "./brandIcons";
-import {
-  canNativeShareFile,
-  canvasToPngFile,
-  copyText,
-  downloadPng,
-  nativeShare,
-  type NativeShareData,
-  postUrlOf,
-  suggestedPostCaption,
-  truthSocialShareUrl,
-  truthSocialTitle,
-  xIntentUrl,
-} from "./share";
-import {
   DEFAULT_RENDER_OPTIONS,
   type LoadedImage,
   type PostData,
@@ -227,9 +208,6 @@ export default function App() {
   const [imageUrlList, setImageUrlList] = useState<string[]>([]);
 
   const [previewUrl, setPreviewUrl] = useState("");
-  const [toast, setToast] = useState("");
-  const [sharing, setSharing] = useState(false);
-  const toastTimer = useRef<number | null>(null);
   const [options, setOptions] = useState<RenderOptions>(DEFAULT_RENDER_OPTIONS);
   const [htmlSource, setHtmlSource] = useState("");
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -533,111 +511,6 @@ export default function App() {
       setError("Something went wrong while generating the image. Please try again.");
     } finally {
       setBusy(false);
-    }
-  }
-
-  function showToast(message: string) {
-    setToast(message);
-    if (toastTimer.current) window.clearTimeout(toastTimer.current);
-    toastTimer.current = window.setTimeout(() => setToast(""), 6000);
-  }
-
-  /** The generated PNG as a shareable file, or null when unavailable. */
-  async function getShareFile(): Promise<File | null> {
-    const canvas = canvasRef.current;
-    if (!canvas) return null;
-    return canvasToPngFile(canvas, `pickax-post-${postId || "image"}.png`);
-  }
-
-  function openInNewTab(url: string): Window | null {
-    return window.open(url, "_blank", "noopener,noreferrer");
-  }
-
-  // Post targets prefill a suggested caption the user can edit before
-  // posting; the image itself carries the @pickaxsocial tag in its footer.
-  type ShareOutcome = "shared" | "dismissed" | "failed";
-  async function tryNativeShare(data: NativeShareData): Promise<ShareOutcome> {
-    try {
-      return (await nativeShare(data)) ? "shared" : "dismissed";
-    } catch {
-      return "failed";
-    }
-  }
-
-  async function handleShareX() {
-    const data = dataRef.current;
-    if (!data || sharing) return;
-    const caption = suggestedPostCaption(data);
-    // Open the composer tab synchronously inside the click gesture so popup
-    // blockers never swallow it — the standard share-button behavior.
-    const tab = openInNewTab(xIntentUrl(caption));
-    setSharing(true);
-    try {
-      const file = await getShareFile();
-      if (file) downloadPng(file, file.name);
-      await copyText(caption);
-      showToast(
-        tab
-          ? "X composer opened in a new tab — attach the downloaded image to your post."
-          : "Pop-up blocked — image downloaded and caption copied, paste them into a new X post."
-      );
-    } finally {
-      setSharing(false);
-    }
-  }
-
-  async function handleShareTruthSocial() {
-    const data = dataRef.current;
-    if (!data || sharing) return;
-    const url = postUrlOf(data);
-    const title = truthSocialTitle(data);
-    const tab = openInNewTab(truthSocialShareUrl(title, url));
-    setSharing(true);
-    try {
-      const file = await getShareFile();
-      if (file) downloadPng(file, file.name);
-      await copyText(url ? `${title}\n${url}` : title);
-      showToast(
-        tab
-          ? "Truth Social composer opened in a new tab — attach the downloaded image to your post."
-          : "Pop-up blocked — image downloaded and caption copied, paste them into a new Truth Social post."
-      );
-    } finally {
-      setSharing(false);
-    }
-  }
-
-  // Story targets share just the image and the link to the post — no caption.
-  async function handleShareStory(appName: "Instagram" | "Snapchat") {
-    const data = dataRef.current;
-    if (!data || sharing) return;
-    setSharing(true);
-    try {
-      const url = postUrlOf(data);
-      const file = await getShareFile();
-      if (!file) {
-        setError("Something went wrong while generating the image. Please try again.");
-        return;
-      }
-      if (canNativeShareFile(file)) {
-        // Mobile: the OS sheet hands the image to the app; the user picks Story.
-        const outcome = await tryNativeShare({
-          files: [file],
-          title: "Pickax post",
-          url: url || undefined,
-        });
-        if (outcome !== "failed") return;
-      }
-      // Desktop: no story API exists — download the image and copy the post
-      // link so it can be added as a link sticker in the story.
-      downloadPng(file, file.name);
-      if (url) await copyText(url);
-      showToast(
-        `Image downloaded${url ? " and post link copied" : ""} — upload it to your ${appName} story` +
-          (url ? " and add the link as a sticker." : ".")
-      );
-    } finally {
-      setSharing(false);
     }
   }
 
@@ -1024,47 +897,6 @@ export default function App() {
                 Generate New
               </button>
             </div>
-            <fieldset className="share" disabled={sharing}>
-              <legend>Share</legend>
-              <p className="hint share-hint">
-                Posts open with a suggested caption you can edit. Stories share
-                the image and the post link.
-              </p>
-              <div className="btn-row center share-row">
-                <button
-                  className="btn share-btn x"
-                  onClick={handleShareX}
-                  disabled={sharing}
-                >
-                  <XIcon />
-                  Post to X
-                </button>
-                <button
-                  className="btn share-btn truth"
-                  onClick={handleShareTruthSocial}
-                  disabled={sharing}
-                >
-                  <TruthSocialIcon />
-                  Post to Truth&nbsp;Social
-                </button>
-                <button
-                  className="btn share-btn ig"
-                  onClick={() => handleShareStory("Instagram")}
-                  disabled={sharing}
-                >
-                  <InstagramIcon />
-                  Instagram Story
-                </button>
-                <button
-                  className="btn share-btn snap"
-                  onClick={() => handleShareStory("Snapchat")}
-                  disabled={sharing}
-                >
-                  <SnapchatIcon />
-                  Snapchat Story
-                </button>
-              </div>
-            </fieldset>
           </section>
         )}
       </main>
@@ -1075,18 +907,6 @@ export default function App() {
         <span className="dot">•</span>
         <span>Not affiliated with Pickax</span>
       </footer>
-      {toast && (
-        <div className="toast" role="status">
-          <span>{toast}</span>
-          <button
-            className="toast-close"
-            onClick={() => setToast("")}
-            aria-label="Dismiss"
-          >
-            ×
-          </button>
-        </div>
-      )}
     </div>
   );
 }
