@@ -18,6 +18,13 @@ import {
 } from "./importHtml";
 import { renderPostImage } from "./renderer";
 import {
+  canNativeShareFiles,
+  SHARE_TARGETS,
+  shareContextOf,
+  type ShareTarget,
+} from "./share";
+import { ShareGlyph } from "./brandIcons";
+import {
   DEFAULT_RENDER_OPTIONS,
   type LoadedImage,
   type PostData,
@@ -212,6 +219,10 @@ export default function App() {
   // The post currently shown in the preview stage; drives which toggles are
   // offered (e.g. "Site embed" only appears when the post has a link card).
   const [previewData, setPreviewData] = useState<PostData | null>(null);
+  // Share sheet state: one "Share" button opens a panel with every network.
+  const [shareOpen, setShareOpen] = useState(false);
+  const [toast, setToast] = useState<string | null>(null);
+  const toastTimer = useRef<number | null>(null);
   const [htmlSource, setHtmlSource] = useState("");
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const dataRef = useRef<PostData | null>(null);
@@ -225,8 +236,32 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Close the share panel on outside click or Escape.
+  useEffect(() => {
+    if (!shareOpen) return;
+    const onDown = (e: PointerEvent) => {
+      if (!(e.target as HTMLElement).closest?.(".share-anchor")) setShareOpen(false);
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setShareOpen(false);
+    };
+    document.addEventListener("pointerdown", onDown);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("pointerdown", onDown);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [shareOpen]);
+
+  function showToast(message: string) {
+    setToast(message);
+    if (toastTimer.current !== null) window.clearTimeout(toastTimer.current);
+    toastTimer.current = window.setTimeout(() => setToast(null), 2600);
+  }
+
   function resetAll() {
     setStage("url");
+    setShareOpen(false);
     setUrl("");
     setPostId("");
     setError("");
@@ -516,6 +551,54 @@ export default function App() {
       setError("Something went wrong while generating the image. Please try again.");
     } finally {
       setBusy(false);
+    }
+  }
+
+  function getPngBlob(): Promise<Blob | null> {
+    const canvas = canvasRef.current;
+    if (!canvas) return Promise.resolve(null);
+    return new Promise((resolve) => canvas.toBlob((blob) => resolve(blob), "image/png"));
+  }
+
+  function shareContext() {
+    const d = previewData;
+    return shareContextOf({
+      postId: d?.postId ?? postId,
+      displayName: d?.displayName ?? displayName,
+      text: d?.text ?? text,
+    });
+  }
+
+  async function handleShareTarget(target: ShareTarget) {
+    const ctx = shareContext();
+    setShareOpen(false);
+    try {
+      if (target.action === "copyImage") {
+        const blob = await getPngBlob();
+        if (!blob) throw new Error("no png");
+        await navigator.clipboard.write([new ClipboardItem({ "image/png": blob })]);
+        showToast("Image copied — paste it anywhere");
+      } else if (target.action === "copyLink") {
+        await navigator.clipboard.writeText(ctx.url);
+        showToast("Link copied");
+      } else if (target.action === "nativeShare") {
+        const blob = await getPngBlob();
+        if (!blob) throw new Error("no png");
+        const file = new File([blob], `pickax-post-${postId || "image"}.png`, {
+          type: "image/png",
+        });
+        await (navigator as Navigator & { share: (d: object) => Promise<void> }).share({
+          files: [file],
+          title: ctx.title,
+          text: ctx.caption,
+        });
+      } else if (target.href) {
+        window.open(target.href(ctx), "_blank", "noopener,noreferrer");
+      }
+    } catch (err) {
+      // The user dismissing the OS sheet is not an error.
+      if (err instanceof DOMException && err.name === "AbortError") return;
+      showToast("Couldn't share from this browser — try Download PNG");
     }
   }
 
@@ -901,17 +984,82 @@ export default function App() {
                 <input type="checkbox" {...toggle("showEngagement")} /> Picks &amp; axes
               </label>
             </fieldset>
-            <div className="btn-row center">
+            <div className="btn-row center share-anchor">
               <button className="btn primary" onClick={handleDownload}>
                 Download PNG
+              </button>
+              <button
+                className="btn"
+                onClick={() => setShareOpen((v) => !v)}
+                aria-expanded={shareOpen}
+                aria-haspopup="true"
+              >
+                <svg
+                  viewBox="0 0 24 24"
+                  width="15"
+                  height="15"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  aria-hidden="true"
+                  style={{ verticalAlign: "-2px", marginRight: "6px" }}
+                >
+                  <circle cx="18" cy="5" r="3" />
+                  <circle cx="6" cy="12" r="3" />
+                  <circle cx="18" cy="19" r="3" />
+                  <path d="M8.59 13.51l6.83 3.98M15.41 6.51l-6.82 3.98" />
+                </svg>
+                Share
               </button>
               <button className="btn" onClick={resetAll}>
                 Generate New
               </button>
+              {shareOpen && (
+                <div className="share-panel" role="menu" aria-label="Share this image">
+                  <div className="share-panel-head">
+                    <span>Share this image</span>
+                    <button
+                      className="share-close"
+                      onClick={() => setShareOpen(false)}
+                      aria-label="Close share menu"
+                    >
+                      ×
+                    </button>
+                  </div>
+                  <div className="share-grid">
+                    {SHARE_TARGETS.filter(
+                      (t) => t.action !== "nativeShare" || canNativeShareFiles(),
+                    ).map((t) => (
+                      <button
+                        key={t.id}
+                        className="share-tile"
+                        onClick={() => void handleShareTarget(t)}
+                        title={t.name}
+                      >
+                        <span className="share-tile-icon">
+                          <ShareGlyph icon={t.icon} color={t.color} />
+                        </span>
+                        <span className="share-tile-name">{t.name}</span>
+                      </button>
+                    ))}
+                  </div>
+                  <p className="share-hint">
+                    Copy image and system share send the actual PNG. Other sites
+                    open with a caption ready for you to post.
+                  </p>
+                </div>
+              )}
             </div>
           </section>
         )}
       </main>
+      {toast && (
+        <div className="toast" role="status">
+          {toast}
+        </div>
+      )}
       <footer className="footer">
         <span>Free tool for the Pickax community</span>
         <span className="dot">•</span>
