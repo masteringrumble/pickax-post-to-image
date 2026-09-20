@@ -158,7 +158,24 @@
       }
     });
 
-    var av = q('img.rounded-full[src*="img.pickax.com"]');
+    // The author's avatar: the rounded-full image inside a link to the
+    // author's own profile — not the first rounded-full on the page, which
+    // is the LOGGED-IN viewer's avatar in the nav.
+    var av = null;
+    if (o.username) {
+      var authorHref = "/" + o.username.toLowerCase();
+      Array.prototype.forEach.call(
+        d.querySelectorAll('a[href^="/"]'),
+        function (a) {
+          if (av) return;
+          if ((a.getAttribute("href") || "").toLowerCase() !== authorHref)
+            return;
+          var im = a.querySelector('img.rounded-full[src*="img.pickax.com"]');
+          if (im) av = im;
+        }
+      );
+    }
+    if (!av) av = q('img.rounded-full[src*="img.pickax.com"]');
     if (av) o.avatarUrl = av.src;
 
     var vs = q('span[title="Post views"]');
@@ -185,10 +202,14 @@
     );
     if (thm) o.videoThumb = thm[0];
 
+    // Every rounded-full image is an avatar (author, viewer, commenters) —
+    // never a post image — so all are excluded, not just the author's.
     o.imageUrls = Array.prototype.filter.call(
       d.querySelectorAll('img[src*="img.pickax.com"]'),
       function (img) {
-        return img !== av;
+        return (
+          img !== av && !(img.classList && img.classList.contains("rounded-full"))
+        );
       }
     )
       .map(function (img) {

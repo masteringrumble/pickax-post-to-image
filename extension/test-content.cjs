@@ -113,4 +113,57 @@ assert.ok(
   "app accepts the extension's avatarUrl field"
 );
 console.log("ok  content.js extraction (quote post, badges, no-image rule)");
+
+// Logged-in DOM, non-quote post: the viewer's avatar (nav + comment box)
+// must not become the author avatar or leak into the post images.
+{
+  const nuxt2 = JSON.stringify([
+    { post: 1 },
+    { id: 710273, content: 2, user: 3 },
+    "Just a post<br>with two lines.",
+    { fullname: "Diamond and Silk", username: "DiamondandSilk", avatar: "user-35295/ds.jpeg", creator: 4 },
+    { id: 5 },
+    99,
+  ]);
+  const viewerAv = "https://img.pickax.com/viewer-9/mr-logo.png";
+  const html2 = `<!DOCTYPE html><html><head>
+<meta property="og:title" content="Diamond and Silk posted">
+<meta property="og:url" content="https://pickax.com/post/710273">
+</head><body>
+<header><nav><a href="/ViewerPerson"><img src="${viewerAv}" class="rounded-full"></a></nav></header>
+<div>
+<a href="/DiamondandSilk"><img src="https://img.pickax.com/user-35295/ds.jpeg" class="rounded-full"></a>
+<a href="/DiamondandSilk">Diamond and Silk</a>
+</div>
+<div><a href="/DiamondandSilk">@DiamondandSilk</a></div>
+<img src="https://img.pickax.com/post-710273/photo1.jpeg" alt="post image">
+<img src="https://img.pickax.com/post-710273/photo2.jpeg" alt="post image">
+<div class="comment-box"><img src="${viewerAv}" class="rounded-full"></div>
+<script id="__NUXT_DATA__" type="application/json">${nuxt2}</script>
+</body></html>`;
+  const dom2 = new JSDOM(html2, { url: "https://pickax.com/post/710273" });
+  delete globalThis.__pickaxPostToImageInjected; // allow re-eval in the test harness
+  const factory2 = new dom2.window.Function(
+    "document",
+    "location",
+    src + "\nreturn globalThis.__pickaxExtractPost;"
+  );
+  const extract2 = factory2(dom2.window.document, dom2.window.location);
+  const o2 = extract2();
+  assert.equal(o2.postId, "710273");
+  assert.equal(
+    o2.avatarUrl,
+    "https://img.pickax.com/user-35295/ds.jpeg",
+    "author avatar, not the viewer's"
+  );
+  assert.deepEqual(
+    o2.imageUrls,
+    [
+      "https://img.pickax.com/post-710273/photo1.jpeg",
+      "https://img.pickax.com/post-710273/photo2.jpeg",
+    ],
+    "viewer avatars excluded from post images"
+  );
+  console.log("ok  content.js on logged-in page (avatar + images)");
+}
 console.log("\nALL EXTENSION TESTS PASSED");

@@ -122,18 +122,34 @@ function extractUsername(doc: Document): string {
   return "";
 }
 
-function extractAvatarUrl(doc: Document): string {
+function extractAvatarUrl(doc: Document, username: string): string {
+  // The author's avatar is the rounded-full image inside a link to the
+  // author's own profile. Scoping by profile href keeps the LOGGED-IN
+  // viewer's avatar (nav bar, comment box) from winning: the old
+  // first-rounded-full-in-DOM query grabbed whoever was logged in.
+  if (username) {
+    const handle = `/${username.toLowerCase()}`;
+    const anchors = Array.from(doc.querySelectorAll('a[href^="/"]'));
+    for (const a of anchors) {
+      if ((a.getAttribute("href") ?? "").toLowerCase() !== handle) continue;
+      const img = a.querySelector('img.rounded-full[src*="img.pickax.com"]');
+      const src = img?.getAttribute("src")?.trim() ?? "";
+      if (src) return src;
+    }
+  }
   const img = doc.querySelector('img.rounded-full[src*="img.pickax.com"]');
   return img?.getAttribute("src")?.trim() ?? "";
 }
 
-// Post images live on img.pickax.com too; the avatar is the rounded one.
+// Post images live on img.pickax.com too. Every rounded-full image is an
+// avatar (post author, logged-in viewer, commenters) — never a post image —
+// so all of them are excluded, not just the author's. On logged-in pages
+// the viewer's nav/comment-box avatars used to leak in as post images.
 function extractImageUrls(doc: Document, avatarUrl: string): string[] {
-  const imgs = Array.from(
-    doc.querySelectorAll('img[src*="img.pickax.com"]')
-  );
+  const imgs = Array.from(doc.querySelectorAll('img[src*="img.pickax.com"]'));
   const urls: string[] = [];
   for (const img of imgs) {
+    if (img.classList.contains("rounded-full")) continue;
     const src = img.getAttribute("src")?.trim() ?? "";
     if (!src || src === avatarUrl || src.includes("favicon")) continue;
     if (!urls.includes(src)) urls.push(src);
@@ -262,7 +278,7 @@ export function parsePostHtml(html: string): ParsedImport {
   // The payload avatar is the QUOTER's own profile picture — deterministic.
   // The old first-rounded-full-in-DOM heuristic could grab the quoted
   // author's avatar (or a post image) on quote posts.
-  const avatarUrl = nuxt?.author.avatarUrl || extractAvatarUrl(doc);
+  const avatarUrl = nuxt?.author.avatarUrl || extractAvatarUrl(doc, username);
 
   // Full body from the page payload when present; truncated og:description
   // is only the fallback.
@@ -342,7 +358,7 @@ function coerceImport(raw: unknown): ParsedImport | null {
   const o = raw as Record<string, unknown>;
   const str = (v: unknown): string =>
     typeof v === "string" ? v : "";
-  // Image/avatar field names: v5 bookmarklets and the browser extension send
+  // Image/avatar field names: v5+ bookmarklets and the browser extension send
   // `images` / `avatar`; older payloads used `imageUrls` / `avatarUrl`.
   const rawImages = Array.isArray(o.imageUrls)
     ? o.imageUrls
@@ -429,7 +445,7 @@ export const BOOKMARKLET: string =
   "var d=document," +
   "q=function(s){return d.querySelector(s)}," +
   "meta=function(p){var e=q('meta[property=\"'+p+'\"]');return e?e.getAttribute('content')||'':''}," +
-  "o={v:5,postId:'',displayName:(meta('og:title')||'').replace(/\\s+posted\\s*$/i,'')," +
+  "o={v:6,postId:'',displayName:(meta('og:title')||'').replace(/\\s+posted\\s*$/i,'')," +
   "text:(meta('og:description')||'').replace(/\\s*user=\\S+\\s+[\\d,]+\\s+Followers\\s*$/i,'')," +
   "username:'',verified:'',avatar:'',timestamp:'',picks:'',axes:'',views:'',videoSrc:'',videoTitle:'',videoThumb:'',images:[],q:null};" +
   "Array.prototype.forEach.call(d.querySelectorAll('a[href^=\"/\"]'),function(a){" +
@@ -447,7 +463,16 @@ export const BOOKMARKLET: string =
   "o.verified=(ph.indexOf('3eb1f9')>-1||/fill-(blue|sky)-\\\\d{3}/.test(ph))?'blue':'gold';}}" +
   "var s=a.nextElementSibling;" +
   "if(s&&s.tagName==='SPAN'&&s.getAttribute('title')&&!o.timestamp)o.timestamp=(s.textContent||'').trim();}});" +
-  "var av=q('img.rounded-full[src*=\"img.pickax.com\"]');" +
+  // The author's avatar: the rounded-full image inside a link to the
+  // author's own profile — not the first rounded-full on the page, which
+  // is the LOGGED-IN viewer's avatar in the nav.
+  "var av=null;" +
+  "if(o.username){var ah='/'+o.username.toLowerCase();" +
+  "Array.prototype.forEach.call(d.querySelectorAll('a[href^=\"/\"]'),function(a){" +
+  "if(av)return;" +
+  "if((a.getAttribute('href')||'').toLowerCase()!==ah)return;" +
+  "var im=a.querySelector('img.rounded-full[src*=\"img.pickax.com\"]');if(im)av=im;});}" +
+  "if(!av)av=q('img.rounded-full[src*=\"img.pickax.com\"]');" +
   "if(av)o.avatar=av.src;" +
   "var vs=q('span[title=\"Post views\"]');" +
   "if(vs){var vm=(vs.getAttribute('aria-label')||'').match(/(\\d[\\d,]*)/);if(vm)o.views=vm[1];}" +
@@ -459,8 +484,11 @@ export const BOOKMARKLET: string =
   "if(fr){o.videoSrc=fr.src||'';o.videoTitle=fr.getAttribute('title')||'';}" +
   "var thm=d.documentElement.innerHTML.match(/https:\\/\\/[a-z0-9.-]+\\.cdn\\.rumble\\.cloud\\/[^\"\\\\\\s'<>]+\\.(?:jpg|jpeg|png|webp)/i);" +
   "if(thm)o.videoThumb=thm[0];" +
+  // Every rounded-full image is an avatar (author, viewer, commenters) —
+  // never a post image — so all are excluded, not just the author's.
   "o.images=Array.prototype.filter.call(d.querySelectorAll('img[src*=\"img.pickax.com\"]')," +
-  "function(i){return i!==av;}).map(function(i){return i.src;}).slice(0,4);" +
+  "function(i){return i!==av&&!(i.classList&&i.classList.contains('rounded-full'));" +
+  "}).map(function(i){return i.src;}).slice(0,4);" +
   "var pm=location.pathname.match(/\\/post\\/(\\d+)/);if(pm)o.postId=pm[1];" +
   // Full post body from the page payload (og:description is truncated).
   // Compact devalue resolver: the payload is a flat array, and integers in

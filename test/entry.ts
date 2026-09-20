@@ -544,6 +544,38 @@ async function main() {
       console.log("ok  verified badge color detection (gold/blue/none)");
     }
 
+    // Logged-in page: the viewer's own avatar sits in the nav (first in DOM
+    // order) and the comment box. It must never become the post avatar or a
+    // post image — regression test for the bookmarklet grabbing the logged-
+    // in user's avatar on post 710273.
+    {
+      const viewerAv = "https://img.pickax.com/viewer-9/mr-logo.png";
+      const loggedInHtml = FIXTURE_HTML.replace(
+        "<body>",
+        `<body><header><nav><a href="/ViewerPerson">` +
+          `<img src="${viewerAv}" class="rounded-full object-cover w-8 h-8">` +
+          `</a></nav></header>`
+      ).replace(
+        "</body>",
+        `<div class="comment-box"><img src="${viewerAv}" ` +
+          `class="rounded-full object-cover w-8 h-8"></div>` +
+          `<div class="comment"><img src="https://img.pickax.com/user-9999/commenter.jpeg" ` +
+          `class="rounded-full object-cover w-8 h-8"></div></body>`
+      );
+      const lp = parsePostHtml(loggedInHtml);
+      assert.equal(
+        lp.avatarUrl,
+        "https://img.pickax.com/user-8356/ea28e48e-147a-4169-bb97-ba71a823d48f.jpeg",
+        "author avatar wins over the logged-in viewer's avatar"
+      );
+      assert.deepEqual(
+        lp.imageUrls,
+        ["https://img.pickax.com/post-1234/abcd.jpeg"],
+        "viewer/commenter avatars are not post images"
+      );
+      console.log("ok  logged-in page: viewer avatars excluded (paste-source)");
+    }
+
     // Legacy v1 bookmarklets sent verified:true — still honored as gold.
     {
       const legacy = {
@@ -628,6 +660,56 @@ async function main() {
     ]);
     delete (globalThis as any).window;
     console.log("ok  bookmarklet end-to-end (extract -> hash -> parse back)");
+
+    // Same bookmarklet code, logged-in DOM: the viewer's avatar must not
+    // leak into the payload as the author avatar or a post image.
+    {
+      const viewerAv = "https://img.pickax.com/viewer-9/mr-logo.png";
+      const loggedInHtml = FIXTURE_HTML.replace(
+        "<body>",
+        `<body><header><nav><a href="/ViewerPerson">` +
+          `<img src="${viewerAv}" class="rounded-full object-cover w-8 h-8">` +
+          `</a></nav></header>`
+      ).replace(
+        "</body>",
+        `<div class="comment-box"><img src="${viewerAv}" ` +
+          `class="rounded-full object-cover w-8 h-8"></div></body>`
+      );
+      const ldom = new JSDOM(loggedInHtml, {
+        url: "https://pickax.com/post/707864",
+      });
+      let lnavigated = "";
+      const lfakeLocation = {
+        pathname: "/post/707864",
+        get href() {
+          return "https://pickax.com/post/707864";
+        },
+        set href(v: string) {
+          lnavigated = v;
+        },
+      };
+      const lbody = BOOKMARKLET.replace(/^javascript:/, "");
+      const lfn = new (ldom.window as any).Function(
+        "document",
+        "location",
+        lbody
+      );
+      lfn(ldom.window.document, lfakeLocation);
+      const lpayload = JSON.parse(
+        decodeURIComponent(lnavigated.split("#import=")[1])
+      );
+      assert.equal(lpayload.v, 6, "bookmarklet v6");
+      assert.ok(
+        lpayload.avatar.includes("img.pickax.com/user-8356"),
+        `author avatar, not viewer's (got ${lpayload.avatar})`
+      );
+      assert.deepEqual(
+        lpayload.images,
+        ["https://img.pickax.com/post-1234/abcd.jpeg"],
+        "viewer avatar not among post images"
+      );
+      console.log("ok  bookmarklet on logged-in page (v6)");
+    }
   }
 
   // ---- quote posts: payload parser finds the post by id -------------------
