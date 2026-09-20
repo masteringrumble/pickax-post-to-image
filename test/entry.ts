@@ -185,6 +185,11 @@ async function main() {
       wrapText("a\r\n\r\nb", 1000, m).filter((l) => l !== "").join("|"),
       "a|b"
     );
+    // Single \n is a soft break (no gap entry); \n\n is one paragraph gap.
+    assert.deepEqual(wrapText("a\nb", 1000, m), ["a", "b"]);
+    assert.deepEqual(wrapText("a\n\nb", 1000, m), ["a", "", "b"]);
+    assert.deepEqual(wrapText("a\n\n\nb", 1000, m), ["a", "", "b"]);
+    assert.deepEqual(wrapText("\na\n", 1000, m), ["a"]);
   }
   console.log("ok  wrapText (paragraphs, emojis, hashtags, urls)");
 

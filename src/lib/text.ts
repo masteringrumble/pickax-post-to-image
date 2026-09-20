@@ -55,8 +55,10 @@ export function wrapParagraph(
 
 /**
  * Wrap full post text, preserving line breaks and paragraphs.
- * A blank entry ("") marks a paragraph gap / preserved empty line and is
- * rendered as vertical spacing, never dropped.
+ * A blank entry ("") marks a paragraph gap and is rendered as vertical
+ * spacing, never dropped. A single line break is a SOFT break: it starts a
+ * new wrapped line with no extra gap, exactly like pickax.com renders <br>
+ * inside a paragraph. Only genuinely empty lines become paragraph gaps.
  */
 export function wrapText(
   text: string,
@@ -65,9 +67,17 @@ export function wrapText(
 ): string[] {
   const out: string[] = [];
   const paragraphs = text.replace(/\r\n/g, "\n").split("\n");
-  paragraphs.forEach((p, i) => {
-    if (i > 0) out.push(""); // paragraph gap
+  for (const p of paragraphs) {
+    if (p.trim() === "") {
+      // Empty line = paragraph gap. Collapse runs of empty lines into one
+      // (cleanText already caps them, but stay safe on raw input).
+      if (out.length > 0 && out[out.length - 1] !== "") out.push("");
+      continue;
+    }
     out.push(...wrapParagraph(p, maxWidth, measure));
-  });
+  }
+  // Never lead or trail with a gap.
+  while (out.length > 0 && out[0] === "") out.shift();
+  while (out.length > 0 && out[out.length - 1] === "") out.pop();
   return out;
 }
