@@ -116,6 +116,17 @@ async function postDataFromWorker(
     }
   }
 
+  // The quoted post (quote posts only): the quoted author's own avatar,
+  // badge, and full text — exactly as the inner card on pickax.com shows.
+  let quotedAvatar: HTMLImageElement | null = null;
+  if (p.quoted?.avatarUrl) {
+    try {
+      quotedAvatar = await loadCdnImage(p.quoted.avatarUrl);
+    } catch {
+      /* quoted card falls back to the placeholder avatar */
+    }
+  }
+
   const data: PostData = {
     postId: p.postId,
     displayName: p.displayName ?? "",
@@ -132,6 +143,17 @@ async function postDataFromWorker(
     },
     video: p.video
       ? { src: p.video.src, title: p.video.title, thumbnail: videoThumb }
+      : null,
+    quoted: p.quoted
+      ? {
+          postId: p.quoted.postId,
+          displayName: p.quoted.displayName ?? "",
+          username: (p.quoted.username ?? "").replace(/^@+/, ""),
+          verified: p.quoted.verified ?? null,
+          avatar: quotedAvatar,
+          text: (p.quoted.text ?? "").replace(/\r\n/g, "\n"),
+          timestamp: p.quoted.timestamp ?? "",
+        }
       : null,
   };
   return { data, notice };
@@ -277,6 +299,17 @@ export default function App() {
       }
     }
 
+    // The quoted post (quote posts only): the quoted author's own avatar,
+    // badge, and full text — exactly as the inner card on pickax.com shows.
+    let quotedAvatar: HTMLImageElement | null = null;
+    if (p.quoted?.avatarUrl) {
+      try {
+        quotedAvatar = await loadCdnImage(p.quoted.avatarUrl);
+      } catch {
+        /* quoted card falls back to the placeholder avatar */
+      }
+    }
+
     const data: PostData = {
       postId: p.postId,
       displayName: p.displayName,
@@ -295,6 +328,17 @@ export default function App() {
         p.videoSrc || p.videoTitle
           ? { src: p.videoSrc, title: p.videoTitle, thumbnail: videoThumb }
           : null,
+      quoted: p.quoted
+        ? {
+            postId: p.quoted.postId,
+            displayName: p.quoted.displayName,
+            username: p.quoted.username,
+            verified: p.quoted.verified,
+            avatar: quotedAvatar,
+            text: p.quoted.text.replace(/\r\n/g, "\n"),
+            timestamp: p.quoted.timestamp,
+          }
+        : null,
     };
     try {
       await renderAndPreview(data);

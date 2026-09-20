@@ -13,6 +13,19 @@ export interface WorkerPostVideo {
   thumbnail: string | null;
 }
 
+export interface WorkerQuotedPost {
+  postId: string;
+  displayName: string | null;
+  username: string | null;
+  /** Absolute https://img.pickax.com/... URL of the QUOTED author's avatar. */
+  avatarUrl: string | null;
+  /** The quoted account's verified badge (gold/blue), or null when none. */
+  verified: VerifiedBadge;
+  text: string | null;
+  /** Relative timestamp as the site shows it, e.g. "2 hours ago". */
+  timestamp: string | null;
+}
+
 export interface WorkerPostPayload {
   postId: string;
   postUrl: string;
@@ -30,6 +43,8 @@ export interface WorkerPostPayload {
   verified: VerifiedBadge;
   images: string[];
   video: WorkerPostVideo | null;
+  /** The quoted post, or null when this is not a quote post. */
+  quoted: WorkerQuotedPost | null;
   fetchedAt: string;
 }
 

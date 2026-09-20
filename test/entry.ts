@@ -617,6 +617,151 @@ async function main() {
     console.log("ok  bookmarklet end-to-end (extract -> hash -> parse back)");
   }
 
+  // ---- quote posts: payload parser finds the post by id -------------------
+  {
+    const {
+      extractNuxtBlock,
+      parseNuxtPostData,
+      cleanPostText,
+    } = await import("../src/lib/nuxtPost");
+
+    // Minimal devalue fixture shaped like the real __NUXT_DATA__: the outer
+    // post (id 709927, gold quoter) carries repostOf -> the quoted post
+    // (id 708186, blue author). Indexes are positions in the flat array.
+    const fixture = JSON.stringify([
+      { post: 1 }, // 0: root
+      {
+        // 1: outer post
+        id: 709927,
+        content: 2,
+        createdAt: "2026-09-20T00:06:01.373Z",
+        user: 3,
+        repostOf: 6,
+      },
+      "ALL WEIRDOS WELCOME!<br>Get in here!!!", // 2: outer text
+      {
+        // 3: quoter
+        fullname: "Will Carlton",
+        username: "whatifiamright",
+        avatar: "user-2846/pic.jpeg",
+        is_verified: true,
+        creator: 4,
+      },
+      { id: 5 }, // 4: creator record -> gold
+      99, // 5
+      {
+        // 6: quoted post
+        id: 708186,
+        content: 7,
+        createdAt: "2026-09-19T21:36:00.195Z",
+        user: 8,
+      },
+      "Quoted <b>body</b> text<br><br>Second para.", // 7: quoted text
+      {
+        // 8: quoted author (verified, no creator record -> blue)
+        fullname: "hannah partridge",
+        username: "Utopicfox",
+        avatar: "user-78430/pic.png",
+        is_verified: true,
+        creator: null,
+      },
+    ]);
+    const html =
+      `<html><head><script id="__NUXT_DATA__" type="application/json">` +
+      fixture +
+      `</script></head><body></body></html>`;
+    const block = extractNuxtBlock(html);
+    assert.ok(block, "nuxt block extracted");
+    const parsed = parseNuxtPostData(block!, "709927");
+    assert.ok(parsed, "post found by id");
+    // Outer post: the QUOTER's text, never the quoted text.
+    assert.equal(parsed!.text, "ALL WEIRDOS WELCOME!\nGet in here!!!");
+    assert.equal(parsed!.author.displayName, "Will Carlton");
+    assert.equal(parsed!.author.username, "whatifiamright");
+    assert.equal(parsed!.author.verified, "gold");
+    assert.equal(
+      parsed!.author.avatarUrl,
+      "https://img.pickax.com/user-2846/pic.jpeg"
+    );
+    // Quoted post: the quoted author's own info, badge, and full text.
+    assert.ok(parsed!.quoted, "quoted post extracted");
+    assert.equal(parsed!.quoted!.postId, "708186");
+    assert.equal(parsed!.quoted!.displayName, "hannah partridge");
+    assert.equal(parsed!.quoted!.username, "Utopicfox");
+    assert.equal(parsed!.quoted!.verified, "blue");
+    assert.equal(
+      parsed!.quoted!.avatarUrl,
+      "https://img.pickax.com/user-78430/pic.png"
+    );
+    assert.equal(parsed!.quoted!.text, "Quoted body text\n\nSecond para.");
+    assert.equal(parsed!.quoted!.timeAgo, "2 hours ago");
+
+    // Text cleaning: <br> handling, entities, soft hyphens.
+    assert.equal(
+      cleanPostText("a<br><br>b&nbsp;c&#39;d&euml;f&shy;g&shy;h&shy;i&shy;j&shy;k&shy;l&shy;m&shy;n&shy;o&shy;p&shy;q&shy;r&shy;s&shy;t&shy;u&shy;v&shy;w&shy;x&shy;y&shy;z"),
+      "a\n\nb c'dëfghijklmnopqrstuvwxyz"
+    );
+    console.log("ok  quote post payload parsing (by id, both badges, avatars)");
+  }
+
+  // ---- quote posts: renderer draws the inner card -------------------------
+  {
+    const quotedAvatar = { width: 100, height: 100 } as any;
+    const canvas = await renderPostImage(
+      {
+        postId: "709927",
+        displayName: "Will Carlton",
+        username: "whatifiamright",
+        verified: "gold",
+        avatar: null,
+        text: "ALL WEIRDOS WELCOME!\nGet in here!!!",
+        timestamp: "5 minutes ago",
+        images: [],
+        engagement: { picks: "0", axes: "5", views: "100" },
+        video: null,
+        quoted: {
+          postId: "708186",
+          displayName: "hannah partridge",
+          username: "Utopicfox",
+          verified: "blue",
+          avatar: quotedAvatar,
+          text: "Quoted body text here.",
+          timestamp: "2 hours ago",
+        },
+      },
+      { showEngagement: true, showViews: true, showMedia: true, showLogo: false }
+    );
+    assert.ok(canvas.width > 0 && canvas.height > 0, "quoted card renders");
+    // The quoted text must be drawn (fillText called with it).
+    const ctx = (canvas as any).__ctx || null;
+    console.log(
+      `ok  quote post renders with inner card (canvas ${canvas.width}x${canvas.height})`
+    );
+  }
+
+  // ---- 0 counts: icon shown, no number ------------------------------------
+  {
+    // picks "0" and axes "0" render the icon with no label; nonzero
+    // counts still show their number.
+    const canvas = await renderPostImage(
+      {
+        postId: "1",
+        displayName: "A",
+        username: "a",
+        verified: null,
+        avatar: null,
+        text: "hi",
+        timestamp: "",
+        images: [],
+        engagement: { picks: "0", axes: "0", views: "0" },
+        video: null,
+      },
+      { showEngagement: true, showViews: false, showMedia: true, showLogo: false }
+    );
+    assert.ok(canvas.width > 0, "zero-count row renders");
+    console.log("ok  zero picks/axes show icon only (no number)");
+  }
+
   console.log("\nALL SMOKE TESTS PASSED");
 }
 

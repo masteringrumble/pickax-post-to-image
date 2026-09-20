@@ -14,6 +14,8 @@ import {
 // ---------------------------------------------------------------------------
 const PX = {
   card: "#222A39", // post card
+  quoteCard: "#1B2334", // quoted-post inner card (darker navy, as on pickax.com)
+  quoteBorder: "#3A4358", // thin slate-blue border around the quoted card
   btn: "#333D52", // engagement buttons + views pill
   divider: "#394050",
   white: "#FFFFFF",
@@ -480,12 +482,42 @@ export async function renderPostImage(
     return w;
   };
   const lines = data.text ? wrapText(data.text, WRAP_W, textWidth) : [];
-  const TEXT_LH = 62;
+  const TEXT_LH = 60;
   // pickax.com separates paragraphs with margin-bottom:1.25rem = 20px at
-  // 15px body text = 1.333x the font size -> 54px at our 40px body size.
-  const PARA_GAP = 54;
+  // 15px body text = 1.333x the font size -> 48px at our 40px body size.
+  const PARA_GAP = 48;
   const blankCount = lines.filter((l) => l === "").length;
   const textH = (lines.length - blankCount) * TEXT_LH + blankCount * PARA_GAP;
+
+  // Header -> post text on pickax.com is ~16px at 15px body = 43px at ours.
+  const GAP_HEADER_TEXT = 43;
+
+  // ---- quoted post (quote posts only): the inner card, measured like the
+  // ---- outer text so the quoted body can never spill outside it ---------
+  // pickax.com inner card: px-5 (20px -> 53) sides, pb-4 (16px -> 43)
+  // bottom; inner header avatar ~30px -> 80, name ~15px -> 40, timestamp
+  // ~12-13px -> 34; quoted text sits pt-2 (8px -> 21) below the header.
+  const Q_PAD_X = 53;
+  const Q_PAD_TOP = 40;
+  const Q_PAD_BOTTOM = 43;
+  const Q_AVATAR = 80;
+  const Q_HEAD_GAP = 32;
+  const Q_TEXT_GAP = 32;
+  const Q_RADIUS = 32;
+  const quoted = data.quoted;
+  const qWrapW = CONTENT_W - Q_PAD_X * 2 - 8;
+  const qLines = quoted?.text ? wrapText(quoted.text, qWrapW, textWidth) : [];
+  const qBlankCount = qLines.filter((l) => l === "").length;
+  const qTextH =
+    (qLines.length - qBlankCount) * TEXT_LH + qBlankCount * PARA_GAP;
+  // Inner header height is set by the avatar; name (40px) + timestamp (34px)
+  // stack beside it.
+  const qHeaderH = Q_AVATAR;
+  const quotedH =
+    quoted && (quoted.text || quoted.displayName)
+      ? Q_PAD_TOP + qHeaderH + (qLines.length > 0 ? Q_TEXT_GAP + qTextH : 0) +
+        Q_PAD_BOTTOM
+      : 0;
 
   const rows = o.showMedia ? layoutImages(data.images) : [];
   const imagesH =
@@ -499,7 +531,8 @@ export async function renderPostImage(
   const FOOTER_TAIL = 56; // divider -> source line
 
   let cardH = CARD_PAD + HEADER_H;
-  if (lines.length > 0) cardH += GAP_SECTION + textH;
+  if (lines.length > 0) cardH += GAP_HEADER_TEXT + textH;
+  if (quotedH > 0) cardH += GAP_SECTION + quotedH;
   if (imagesH > 0) cardH += GAP_SECTION + imagesH;
   if (videoH > 0) cardH += GAP_SECTION + videoH;
   if (engagementH > 0) cardH += GAP_SECTION + engagementH;
@@ -633,7 +666,7 @@ export async function renderPostImage(
 
   // ---- post text ----------------------------------------------------------
   if (lines.length > 0) {
-    y += GAP_SECTION;
+    y += GAP_HEADER_TEXT;
     ctx.font = bodyFont(40);
     let lastAdvance = 0;
     for (const line of lines) {
@@ -647,6 +680,101 @@ export async function renderPostImage(
       }
     }
     y -= lastAdvance; // back up: the loop advanced past the last line
+  }
+
+  // ---- quoted post: the inner card, exactly like pickax.com ---------------
+  // Darker navy card, thin border, the quoted author's own header (avatar,
+  // name + their badge, timestamp) and their full text.
+  if (quoted && quotedH > 0) {
+    y += GAP_SECTION;
+    const qx = cx0;
+    const qw = CONTENT_W;
+    roundRectPath(ctx, qx, y, qw, quotedH, Q_RADIUS);
+    ctx.fillStyle = PX.quoteCard;
+    ctx.fill();
+    ctx.strokeStyle = PX.quoteBorder;
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    let qy = y + Q_PAD_TOP;
+    const qcx = qx + Q_PAD_X;
+
+    // Inner header: avatar, name + badge, timestamp on the second line.
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(qcx + Q_AVATAR / 2, qy + Q_AVATAR / 2, Q_AVATAR / 2, 0, Math.PI * 2);
+    ctx.clip();
+    if (quoted.avatar) {
+      ctx.drawImage(quoted.avatar, qcx, qy, Q_AVATAR, Q_AVATAR);
+    } else {
+      ctx.fillStyle = PX.avatarBg;
+      ctx.fillRect(qcx, qy, Q_AVATAR, Q_AVATAR);
+      const initial = (
+        quoted.displayName[0] ||
+        quoted.username[0] ||
+        "?"
+      ).toUpperCase();
+      ctx.fillStyle = PX.avatarInitial;
+      ctx.font = font(40, 600);
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText(initial, qcx + Q_AVATAR / 2, qy + Q_AVATAR / 2 + 2);
+      ctx.textBaseline = "alphabetic";
+      ctx.textAlign = "left";
+    }
+    ctx.restore();
+
+    const qNameX = qcx + Q_AVATAR + Q_HEAD_GAP;
+    const qBadgeColor =
+      quoted.verified === "blue"
+        ? PX.badgeBlue
+        : quoted.verified === "gold"
+          ? PX.badgeOrange
+          : null;
+    const Q_BADGE_S = 32;
+    const qNameMaxW =
+      qw - Q_PAD_X * 2 - Q_AVATAR - Q_HEAD_GAP - (qBadgeColor ? Q_BADGE_S + 12 : 0);
+    // Name baseline sits in the avatar's upper half, timestamp in the lower.
+    const qNameY = qy + 34;
+    if (quoted.displayName) {
+      ctx.fillStyle = PX.white;
+      ctx.font = font(40, 700);
+      const shownQName = truncate(ctx, quoted.displayName, qNameMaxW);
+      ctx.fillText(shownQName, qNameX, qNameY);
+      if (qBadgeColor) {
+        const qNameW = ctx.measureText(shownQName).width;
+        drawVerifiedBadge(ctx, qNameX + qNameW + 12, qNameY - 13, Q_BADGE_S, qBadgeColor);
+      }
+    }
+    if (quoted.timestamp) {
+      ctx.fillStyle = PX.muted;
+      ctx.font = font(34);
+      ctx.fillText(
+        truncate(ctx, quoted.timestamp, qw - Q_PAD_X * 2 - Q_AVATAR - Q_HEAD_GAP),
+        qNameX,
+        qy + 74
+      );
+    }
+    qy += qHeaderH;
+
+    // Quoted text, same body style as the outer post.
+    if (qLines.length > 0) {
+      qy += Q_TEXT_GAP;
+      ctx.font = bodyFont(40);
+      let qLastAdvance = 0;
+      for (const line of qLines) {
+        if (line === "") {
+          qy += PARA_GAP;
+          qLastAdvance = PARA_GAP;
+        } else {
+          drawRichLine(ctx, line, qcx, qy);
+          qy += TEXT_LH;
+          qLastAdvance = TEXT_LH;
+        }
+      }
+      qy -= qLastAdvance;
+    }
+    y += quotedH;
   }
 
   // ---- attached images ----------------------------------------------------
@@ -720,7 +848,15 @@ export async function renderPostImage(
     y += GAP_SECTION;
     const btnW = (CONTENT_W - BTN_GAP * 4) / 5;
     let bx = cx0;
-    drawEngagementButton(ctx, bx, y, btnW, BTN_H, "picks", picks);
+    drawEngagementButton(
+      ctx,
+      bx,
+      y,
+      btnW,
+      BTN_H,
+      "picks",
+      picks === "0" ? "" : picks
+    );
     bx += btnW + BTN_GAP;
     drawEngagementButton(
       ctx,

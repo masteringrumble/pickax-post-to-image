@@ -37,6 +37,21 @@ export interface PostVideo {
   thumbnail: LoadedImage | null;
 }
 
+// A quoted (reposted) post embedded inside a quote post, as pickax.com
+// shows it: the quoted author's own header (avatar, name, badge,
+// timestamp) and their full text, inside the darker inner card.
+export interface QuotedPost {
+  postId: string;
+  displayName: string;
+  username: string;
+  /** The quoted account's verified badge (gold/blue), or null when none. */
+  verified: VerifiedBadge;
+  /** The quoted author's own profile picture (not the post image). */
+  avatar: HTMLImageElement | null;
+  text: string;
+  timestamp: string;
+}
+
 // Everything the renderer needs. Every field is either retrieved from the
 // public post, auto-imported, or typed in by the user in manual mode.
 // Nothing here is ever invented by the app.
@@ -52,6 +67,8 @@ export interface PostData {
   images: LoadedImage[];
   engagement: Engagement;
   video?: PostVideo | null;
+  /** Set when the post quotes another post; null/undefined otherwise. */
+  quoted?: QuotedPost | null;
 }
 
 // Toggles for what appears in the generated image. Everything defaults to

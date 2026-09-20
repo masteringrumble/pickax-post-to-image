@@ -5,6 +5,24 @@
 // in their own browser. Nothing is fetched by the app, nothing is invented:
 // fields the page doesn't provide stay empty and are omitted from the image.
 
+import {
+  extractNuxtBlock,
+  parseNuxtPostData,
+  type NuxtPostData,
+} from "./lib/nuxtPost";
+
+export interface ParsedQuotedPost {
+  postId: string;
+  displayName: string;
+  username: string;
+  /** The quoted account's verified badge (gold/blue), or null when none. */
+  verified: "gold" | "blue" | null;
+  avatarUrl: string;
+  text: string;
+  /** Relative timestamp as the site shows it, e.g. "2 hours ago". */
+  timestamp: string;
+}
+
 export interface ParsedImport {
   postId: string;
   displayName: string;
@@ -24,6 +42,8 @@ export interface ParsedImport {
   /** Pickax "axe" (dislike) count. */
   axes: string;
   views: string;
+  /** The quoted post, or null when this is not a quote post. */
+  quoted: ParsedQuotedPost | null;
 }
 
 const APP_URL = "https://masteringrumble.github.io/pickax-post-to-image/";
@@ -221,18 +241,33 @@ export class ImportParseError extends Error {}
 export function parsePostHtml(html: string): ParsedImport {
   const doc = new DOMParser().parseFromString(html, "text/html");
 
-  const displayName = cleanTitle(metaContent(doc, "og:title"));
-  const username = extractUsername(doc);
-  const avatarUrl = extractAvatarUrl(doc);
-
+  // Primary source: the __NUXT_DATA__ devalue payload. The post object is
+  // matched by id, so on quote posts the OUTER text/author/avatar can never
+  // be mixed up with the quoted post's (the old longest-<br>-string
+  // heuristic picked whichever text was longer). DOM scraping below is
+  // only the fallback for fields the payload doesn't carry.
   let postId = "";
   const ogUrl = metaContent(doc, "og:url");
   const idMatch = ogUrl.match(/\/post\/(\d+)/);
   if (idMatch) postId = idMatch[1];
 
+  const nuxtBlock = extractNuxtBlock(html);
+  const nuxt: NuxtPostData | null = nuxtBlock
+    ? parseNuxtPostData(nuxtBlock, postId)
+    : null;
+
+  const displayName =
+    nuxt?.author.displayName || cleanTitle(metaContent(doc, "og:title"));
+  const username = nuxt?.author.username || extractUsername(doc);
+  // The payload avatar is the QUOTER's own profile picture — deterministic.
+  // The old first-rounded-full-in-DOM heuristic could grab the quoted
+  // author's avatar (or a post image) on quote posts.
+  const avatarUrl = nuxt?.author.avatarUrl || extractAvatarUrl(doc);
+
   // Full body from the page payload when present; truncated og:description
   // is only the fallback.
   const text =
+    nuxt?.text ||
     extractFullText(doc, postId) ||
     cleanDescription(metaContent(doc, "og:description"));
 
@@ -246,11 +281,23 @@ export function parsePostHtml(html: string): ParsedImport {
 
   const video = extractVideo(doc, html);
 
+  const quoted: ParsedQuotedPost | null = nuxt?.quoted
+    ? {
+        postId: nuxt.quoted.postId,
+        displayName: nuxt.quoted.displayName,
+        username: nuxt.quoted.username,
+        verified: nuxt.quoted.verified,
+        avatarUrl: nuxt.quoted.avatarUrl,
+        text: nuxt.quoted.text,
+        timestamp: nuxt.quoted.timeAgo,
+      }
+    : null;
+
   return {
     postId,
     displayName,
     username,
-    verified: extractVerified(doc, username),
+    verified: nuxt?.author.verified ?? extractVerified(doc, username),
     avatarUrl,
     text,
     timestamp: extractTimestamp(doc),
@@ -261,6 +308,7 @@ export function parsePostHtml(html: string): ParsedImport {
     picks: extractPicks(doc),
     axes: extractAxes(doc),
     views: extractViews(doc),
+    quoted,
   };
 }
 
@@ -294,6 +342,24 @@ function coerceImport(raw: unknown): ParsedImport | null {
   const imageUrls = Array.isArray(o.imageUrls)
     ? o.imageUrls.filter((u): u is string => typeof u === "string").slice(0, 4)
     : [];
+  // v5 bookmarklets send the quoted post as `q`; older ones send nothing.
+  const q = o.q && typeof o.q === "object" ? (o.q as Record<string, unknown>) : null;
+  const quoted: ParsedQuotedPost | null = q
+    ? {
+        postId: str(q.postId),
+        displayName: str(q.displayName),
+        username: str(q.username).replace(/^@+/, ""),
+        verified:
+          q.verified === "blue"
+            ? "blue"
+            : q.verified === "gold"
+              ? "gold"
+              : null,
+        avatarUrl: str(q.avatarUrl),
+        text: str(q.text),
+        timestamp: str(q.timestamp),
+      }
+    : null;
   const parsed: ParsedImport = {
     postId: str(o.postId),
     displayName: str(o.displayName),
@@ -317,6 +383,7 @@ function coerceImport(raw: unknown): ParsedImport | null {
     picks: str(o.picks) || str(o.likes),
     axes: str(o.axes),
     views: str(o.views),
+    quoted,
   };
   if (!parsed.displayName && !parsed.text && !parsed.username) return null;
   return parsed;
@@ -352,9 +419,9 @@ export const BOOKMARKLET: string =
   "var d=document," +
   "q=function(s){return d.querySelector(s)}," +
   "meta=function(p){var e=q('meta[property=\"'+p+'\"]');return e?e.getAttribute('content')||'':''}," +
-  "o={v:4,postId:'',displayName:(meta('og:title')||'').replace(/\\s+posted\\s*$/i,'')," +
+  "o={v:5,postId:'',displayName:(meta('og:title')||'').replace(/\\s+posted\\s*$/i,'')," +
   "text:(meta('og:description')||'').replace(/\\s*user=\\S+\\s+[\\d,]+\\s+Followers\\s*$/i,'')," +
-  "username:'',verified:'',avatar:'',timestamp:'',picks:'',axes:'',views:'',videoSrc:'',videoTitle:'',videoThumb:'',images:[]};" +
+  "username:'',verified:'',avatar:'',timestamp:'',picks:'',axes:'',views:'',videoSrc:'',videoTitle:'',videoThumb:'',images:[],q:null};" +
   "Array.prototype.forEach.call(d.querySelectorAll('a[href^=\"/\"]'),function(a){" +
   "var t=(a.textContent||'').trim();" +
   "if(t.charAt(0)==='@'&&t.length>1){" +
@@ -386,13 +453,44 @@ export const BOOKMARKLET: string =
   "function(i){return i!==av;}).map(function(i){return i.src;}).slice(0,4);" +
   "var pm=location.pathname.match(/\\/post\\/(\\d+)/);if(pm)o.postId=pm[1];" +
   // Full post body from the page payload (og:description is truncated).
+  // Compact devalue resolver: the payload is a flat array, and integers in
+  // value positions are indexes into it. The post object is matched by id,
+  // so on quote posts the OUTER fields can never be mixed up with the
+  // quoted post's — and the quoted post (repostOf) comes along with the
+  // quoted author's own avatar, badge, and timestamp.
+  "function dvD(A,i,M,S){if(M[i]!==undefined)return M[i];if(S[i])return;S[i]=1;var v=A[i],o,k;" +
+  "if(v&&typeof v==='object'){o=Array.isArray(v)?[]:{};M[i]=o;for(k in v)o[k]=dvV(A,v[k],M,S);}else o=v;" +
+  "S[i]=0;M[i]=o;return o;};" +
+  "function dvV(A,v,M,S){if(typeof v==='number'&&v>=0&&v<A.length&&Math.floor(v)===v)return dvD(A,v,M,S);" +
+  "if(v&&typeof v==='object'){var o=Array.isArray(v)?[]:{},k;for(k in v)o[k]=dvV(A,v[k],M,S);return o;}return v;};" +
+  "function dvC(s){return String(s||'').replace(/<br\\s*\\/?>/gi,'\\n').replace(/<[^>]*>/g,'')" +
+  ".replace(/&nbsp;/gi,' ').replace(/&#(\\d+);/g,function(m,n){return String.fromCharCode(parseInt(n,10));})" +
+  ".replace(/&quot;/g,'\"').replace(/&#39;|&apos;/g,\"'\").replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&amp;/g,'&')" +
+  ".replace(/\\\\xad/gi,'').replace(/\\u00ad/g,'').replace(/\\\\n/g,'\\n').replace(/\\n{3,}/g,'\\n\\n').trim();};" +
+  "function dvT(iso){var t=Date.parse(iso);if(isNaN(t))return '';var s=Math.max(0,Math.round((Date.now()-t)/1000));" +
+  "if(s<60)return 'just now';var m=Math.floor(s/60);if(m<60)return m+(m===1?' minute ago':' minutes ago');" +
+  "var h=Math.floor(m/60);if(h<24)return h+(h===1?' hour ago':' hours ago');" +
+  "var dd=Math.floor(h/24);if(dd<7)return dd+(dd===1?' day ago':' days ago');" +
+  "return new Date(t).toLocaleDateString(undefined,{month:'short',day:'numeric',year:'numeric'});};" +
   "var nd=d.getElementById('__NUXT_DATA__');" +
-  "if(nd&&o.postId){try{var J=JSON.parse(nd.textContent||''),SS=[];" +
-  "(function wk(o){if(typeof o==='string'||typeof o==='number')SS.push(''+o);else if(o&&typeof o==='object')for(var k in o)wk(o[k]);})(J);" +
-  "var si=SS.indexOf(o.postId),bt='';" +
-  "for(var i3=(si<0?0:si);i3<SS.length;i3++){var s3=SS[i3];if(s3.indexOf('<br')>-1&&s3.length>80&&s3.length>bt.length)bt=s3;}" +
-  "if(!bt)for(var j3=0;j3<SS.length;j3++){var t3=SS[j3];if(t3.indexOf('<br')>-1&&t3.length>80&&t3.length>bt.length)bt=t3;}" +
-  "if(bt){var dv=d.createElement('div');dv.innerHTML=bt.replace(/<br\\s*\\/?>/gi,'\\n').replace(/&nbsp;/gi,' ');" +
-  "var ct=(dv.textContent||'').replace(/\\n{3,}/g,'\\n\\n').trim();if(ct)o.text=ct;}}catch(e){}}" +
+  "if(nd&&o.postId){try{var A=JSON.parse(nd.textContent||'');" +
+  "if(A&&A.length){var RT=dvD(A,0,{},{}),seen=[],tgt=null;" +
+  "(function wk(x){if(tgt||!x||typeof x!=='object')return;if(seen.indexOf(x)>-1)return;seen.push(x);" +
+  "if(typeof x.content==='string'&&String(x.id)===String(o.postId)&&x.user){tgt=x;return;}" +
+  "for(var k in x)wk(x[k]);})(RT);" +
+  "if(tgt){var u=tgt.user||{},ct=dvC(tgt.content);" +
+  "if(ct)o.text=ct;" +
+  "if(u.fullname)o.displayName=u.fullname;" +
+  "if(u.username)o.username=String(u.username).replace(/^@+/,'');" +
+  "if(u.avatar)o.avatar='https://img.pickax.com/'+u.avatar;" +
+  "o.verified=u.creator?'gold':(u.is_verified?'blue':o.verified);" +
+  "var rp=tgt.repostOf;" +
+  "if(rp&&typeof rp.content==='string'){var qu=rp.user||{};" +
+  "o.q={postId:String(rp.id||''),displayName:qu.fullname||''," +
+  "username:String(qu.username||'').replace(/^@+/,'')" +
+  ",avatarUrl:qu.avatar?('https://img.pickax.com/'+qu.avatar):''," +
+  "verified:qu.creator?'gold':(qu.is_verified?'blue':'')," +
+  "text:dvC(rp.content),timestamp:dvT(rp.createdAt||'')};}}}" +
+  "}catch(e){}}" +
   "location.href='" + APP_URL + "#import='+encodeURIComponent(JSON.stringify(o));" +
   "})()";

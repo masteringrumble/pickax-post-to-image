@@ -5,6 +5,12 @@
 // fetch where CORS doesn't apply (server-to-server). Only PUBLIC posts are
 // supported; no credentials are used or stored.
 
+import {
+  extractNuxtBlock,
+  parseNuxtPostData,
+  type NuxtPostData,
+} from "../../src/lib/nuxtPost";
+
 const POST_URL_RE = /^https?:\/\/(?:www\.)?pickax\.com\/post\/(\d+)(?:[/?#].*)?$/i;
 
 function decodeEntities(s: string): string {
@@ -79,6 +85,19 @@ function extractFullText(html: string, postId: string): string | null {
   return cleaned || null;
 }
 
+export interface WorkerQuotedPost {
+  postId: string;
+  displayName: string | null;
+  username: string | null;
+  /** Absolute https://img.pickax.com/... URL of the QUOTED author's avatar. */
+  avatarUrl: string | null;
+  /** The quoted account's verified badge (gold/blue), or null when none. */
+  verified: "gold" | "blue" | null;
+  text: string | null;
+  /** Relative timestamp as the site shows it, e.g. "2 hours ago". */
+  timestamp: string | null;
+}
+
 export interface PostPayload {
   postId: string;
   postUrl: string;
@@ -100,6 +119,8 @@ export interface PostPayload {
   verified: "gold" | "blue" | null;
   images: string[];
   video: { src: string; title: string; thumbnail: string | null } | null;
+  /** The quoted post, or null when this is not a quote post. */
+  quoted: WorkerQuotedPost | null;
   fetchedAt: string;
 }
 
@@ -157,27 +178,39 @@ function extractVideoThumbnail(html: string): string | null {
 }
 
 export function extract(html: string, postId: string, postUrl: string): PostPayload | null {
+  // Primary source: the __NUXT_DATA__ devalue payload. It carries the exact
+  // post object by id (so on quote posts the OUTER text can never be mixed
+  // up with the quoted text), the author's avatar path, the verified badge
+  // state, and the quoted post (repostOf) when this is a quote post.
+  // DOM scraping below is only the fallback.
+  const nuxtBlock = extractNuxtBlock(html);
+  const nuxt: NuxtPostData | null = nuxtBlock
+    ? parseNuxtPostData(nuxtBlock, postId)
+    : null;
+
   // Display name + @username: adjacent profile links after the avatar.
   // <a href="/Handle" class="cursor-pointer inline-block overflow-clip">Name</a>
   // <a href="/Handle" class="cursor-pointer text-sm ...">@Handle</a><span title="Sep 19, 2026, 9:11 PM">…</span>
   const nameMatch = html.match(
     /<a href="\/([\w.]+)"[^>]*class="[^"]*cursor-pointer inline-block overflow-clip"[^>]*>([^<>]{1,80})<\/a>/
   );
-  const displayName = nameMatch ? decodeEntities(nameMatch[2]).trim() : null;
+  const displayName =
+    nuxt?.author.displayName ||
+    (nameMatch ? decodeEntities(nameMatch[2]).trim() : null) ||
+    null;
   const handleMatch = html.match(
     /<a href="\/[\w.]+"[^>]*class="[^"]*text-sm[^"]*"[^>]*>@([\w.]+)<\/a>/
   );
-  const username = handleMatch ? handleMatch[1] : nameMatch ? nameMatch[1] : null;
+  const username =
+    nuxt?.author.username ||
+    (handleMatch ? handleMatch[1] : nameMatch ? nameMatch[1] : null) ||
+    null;
 
-  // Verified badge: the seal SVG (signature path "M12.7893 4.26666") renders
-  // in a div immediately after the author's display-name link. Scoped to the
-  // header so verified commenters elsewhere on the page can't false-positive.
-  // The seal's color is the account's real badge: gold (fill-orange-300 /
-  // #FDBA74, "Verified Creator") or blue (fill-blue-*/fill-sky-* / #3EB1F9).
-  // A seal with no recognizable color defaults to gold — every public badge
-  // observed is gold. No seal at all means the account has none.
-  let verified: "gold" | "blue" | null = null;
-  if (nameMatch && typeof nameMatch.index === "number") {
+  // Verified badge: the payload knows the account's real state
+  // (creator record -> gold "Verified Creator", is_verified -> blue).
+  // The seal-SVG DOM scrape stays as the fallback.
+  let verified: "gold" | "blue" | null = nuxt?.author.verified ?? null;
+  if (verified === null && nameMatch && typeof nameMatch.index === "number") {
     const slice = html.slice(nameMatch.index, nameMatch.index + 2000);
     if (slice.includes("12.7893 4.26666")) {
       const s = slice.toLowerCase();
@@ -189,15 +222,19 @@ export function extract(html: string, postId: string, postUrl: string): PostPayl
     /@[\w.]+<\/a><span title="([^"]+)"[^>]*>([^<>]{1,40})<\/span>/
   );
 
-  // Avatar: the rounded-full img served from img.pickax.com
-  let avatarUrl: string | null = null;
-  const imgTags = html.match(/<img[^>]*>/gi) ?? [];
-  for (const tag of imgTags) {
-    if (!/rounded-full/i.test(tag)) continue;
-    const src = tag.match(/src=["'](https:\/\/img\.pickax\.com\/[^"']+)["']/i);
-    if (src) {
-      avatarUrl = src[1];
-      break;
+  // Avatar: the payload's user.avatar is the QUOTER's own profile picture —
+  // deterministic. The old first-rounded-full-in-DOM heuristic could grab
+  // the quoted author's avatar (or a post image) on quote posts.
+  let avatarUrl: string | null = nuxt?.author.avatarUrl || null;
+  if (!avatarUrl) {
+    const imgTags = html.match(/<img[^>]*>/gi) ?? [];
+    for (const tag of imgTags) {
+      if (!/rounded-full/i.test(tag)) continue;
+      const src = tag.match(/src=["'](https:\/\/img\.pickax\.com\/[^"']+)["']/i);
+      if (src) {
+        avatarUrl = src[1];
+        break;
+      }
     }
   }
 
@@ -211,11 +248,13 @@ export function extract(html: string, postId: string, postUrl: string): PostPayl
 
   const viewsMatch = html.match(/aria-label="Post views:\s*([\d,]+)"/i);
 
-  // Post text: full body from the __NUXT_DATA__ payload when present;
-  // og:description (truncated) is only the fallback.
+  // Post text: the payload's post object is matched by id, so on quote
+  // posts the OUTER text can never be mixed up with the quoted text (the
+  // old longest-<br>-string heuristic picked whichever was longer).
   const rawDesc = metaContent(html, "og:description");
   const text =
-    extractFullText(html, postId) ??
+    nuxt?.text ||
+    extractFullText(html, postId) ||
     (rawDesc ? cleanDescription(rawDesc) : null);
 
   // NOTE: picks/axes selectors are being confirmed against the live site.
@@ -224,6 +263,20 @@ export function extract(html: string, postId: string, postUrl: string): PostPayl
   const { picks, axes } = extractEngagement(html);
   const comments: string | null = null;
   const video = extractVideo(html);
+
+  // The quoted post (repostOf) from the payload: the quoted author's own
+  // header info, avatar, badge, full text, and timestamp.
+  const quoted: WorkerQuotedPost | null = nuxt?.quoted
+    ? {
+        postId: nuxt.quoted.postId,
+        displayName: nuxt.quoted.displayName || null,
+        username: nuxt.quoted.username || null,
+        avatarUrl: nuxt.quoted.avatarUrl || null,
+        verified: nuxt.quoted.verified,
+        text: nuxt.quoted.text || null,
+        timestamp: nuxt.quoted.timeAgo || null,
+      }
+    : null;
 
   if (!displayName && !username && !text) return null; // not a recognizable post page
 
@@ -243,6 +296,7 @@ export function extract(html: string, postId: string, postUrl: string): PostPayl
     verified,
     images,
     video,
+    quoted,
     fetchedAt: new Date().toISOString(),
   };
 }
