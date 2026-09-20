@@ -1,13 +1,13 @@
 # Pickax Post to Image
 
-A lightweight personal-use tool that converts public Pickax posts into
-downloadable PNG images.
+A free tool that turns any public Pickax post into a clean, downloadable
+PNG image.
 
 Paste a Pickax post URL → generate a polished post graphic → download the PNG.
 
 ## What it does
 
-- Takes a public Pickax post URL (e.g. `https://pickax.com/post/707864`)
+- Takes a public Pickax post URL (e.g. `https://pickax.com/post/######`)
 - Tries to import the public post data automatically
 - **Limitation:** Pickax does not send CORS headers, so browsers block
   direct page access. When automatic import is blocked, the app says so
@@ -67,7 +67,8 @@ Deployment is automatic via GitHub Actions (`.github/workflows/deploy.yml`):
 1. Push to the `main` branch.
 2. The workflow installs dependencies, runs `npm run build`, and
    publishes `dist/` to GitHub Pages.
-3. The site is served at `https://<your-username>.github.io/pickax-post-to-image/`
-   (Vite `base` is set to `/pickax-post-to-image/` for this project path).
+3. The site is served at `https://www.pickax2image.top/` (custom domain;
+   Vite `base` is `"./"` so the build works on any host or subpath).
 
-One-time setup in the repo: Settings → Pages → Source: **GitHub Actions**.
+One-time setup in the repo: Settings → Pages → Source: **GitHub Actions**,
+Custom domain: `www.pickax2image.top`.
