@@ -84,11 +84,12 @@ function makeCtx(): any {
     fillRect() {
       calls.push(["fillRect"]);
     },
-    fillText(t: string, x: number, _y: number) {
+    fillText(t: string, x: number, y: number) {
       calls.push([
         "fillText",
         t,
         x,
+        y,
         (this as any).textAlign || "left",
         (this as any)._fillStyle || "",
       ]);
@@ -335,7 +336,7 @@ async function main() {
         // stub measure at 40px, the size the post text is drawn at;
         // right-aligned text (footer link) extends left from x
         const w = c[1].length * 40 * 0.55;
-        maxExtent = Math.max(maxExtent, c[3] === "right" ? c[2] : c[2] + w);
+        maxExtent = Math.max(maxExtent, c[4] === "right" ? c[2] : c[2] + w);
       }
     }
     assert.ok(maxExtent > 0, "text was drawn");
@@ -355,7 +356,7 @@ async function main() {
     });
     const fills = canvas._ctx.calls.filter((c: any) => c[0] === "fillText");
     const colorOf = (word: string) =>
-      (fills.find((c: any) => c[1] === word) || [])[4];
+      (fills.find((c: any) => c[1] === word) || [])[5];
     assert.equal(colorOf("@gamingonrumble"), "#3EB1F9", "@mention is Pickax blue");
     assert.equal(colorOf("#RumbleTakeover"), "#FFFFFF", "#hashtag is body-white");
     assert.equal(colorOf("hi"), "#FFFFFF", "plain word is body-white");
@@ -766,6 +767,28 @@ async function main() {
         linkTexts.some((t: string) => t.includes("Rural Alaskans Push Back")),
         "title drawn"
       );
+      // The domain and the title's first line must not overlap: the title's
+      // first baseline sits a full ascent below its text top, and title
+      // lines advance by the regular line height.
+      const fillCalls = linkCanvas._ctx.calls.filter(
+        (c: any) => c[0] === "fillText"
+      );
+      const domainCall = fillCalls.find((c: any) => c[1] === "trendingpoliticsnews.com");
+      const titleCalls = fillCalls.filter((c: any) =>
+        (c[1] as string).includes("Rural Alaskans Push Back")
+      );
+      assert.ok(domainCall && titleCalls.length > 0, "both drawn");
+      assert.ok(
+        titleCalls[0][3] - domainCall[3] >= 40,
+        `title first baseline clears the domain (gap ${titleCalls[0][3] - domainCall[3]})`
+      );
+      for (let i = 1; i < titleCalls.length; i++) {
+        assert.equal(
+          titleCalls[i][3] - titleCalls[i - 1][3],
+          60,
+          "title lines advance by TEXT_LH"
+        );
+      }
       console.log("ok  renderer: link card draws domain + title");
     }
 

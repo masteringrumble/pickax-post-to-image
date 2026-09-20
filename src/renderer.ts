@@ -537,15 +537,21 @@ export async function renderPostImage(
   const LINK_IMG_TEXT_GAP = 32; // mb-1 + p-2 top at our scale
   const LINK_TITLE_GAP = 11; // gap-1 at our scale
   const LINK_DOMAIN_H = 44; // 32px domain line
+  const LINK_TITLE_ASCENT = 32; // first title baseline sits one ascent below the text top
   const linkTextW = CONTENT_W - (LINK_PAD + LINK_TEXT_PAD) * 2;
   let linkH = 0;
   let linkImgH = 0;
   let linkTitleLines: string[] = [];
+  let linkTitleH = 0;
   if (linkCard && (linkCard.title || linkCard.domain || linkCard.image)) {
     measure.font = bodyFont(40);
     linkTitleLines = linkCard.title
       ? wrapText(linkCard.title, linkTextW, (t) => measure.measureText(t).width)
       : [];
+    linkTitleH =
+      linkTitleLines.length > 0
+        ? LINK_TITLE_ASCENT + (linkTitleLines.length - 1) * TEXT_LH
+        : 0;
     linkImgH = linkCard.image
       ? Math.round(((CONTENT_W - LINK_PAD * 2) * 9) / 16)
       : 0;
@@ -555,7 +561,7 @@ export async function renderPostImage(
       (linkImgH > 0 ? LINK_IMG_TEXT_GAP : 0) +
       (linkCard.domain ? LINK_DOMAIN_H : 0) +
       (linkCard.domain && linkTitleLines.length > 0 ? LINK_TITLE_GAP : 0) +
-      linkTitleLines.length * TEXT_LH +
+      linkTitleH +
       LINK_PAD;
   }
 
@@ -885,9 +891,12 @@ export async function renderPostImage(
     if (linkTitleLines.length > 0) {
       ctx.fillStyle = PX.white;
       ctx.font = bodyFont(40);
+      // First baseline sits one ascent below the text top so the glyphs
+      // never reach up into the domain line.
+      let ty = ly + LINK_TITLE_ASCENT;
       for (const line of linkTitleLines) {
-        ctx.fillText(line, ltx, ly);
-        ly += TEXT_LH;
+        ctx.fillText(line, ltx, ty);
+        ty += TEXT_LH;
       }
     }
     y += linkH;
