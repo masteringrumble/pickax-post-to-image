@@ -342,9 +342,16 @@ function coerceImport(raw: unknown): ParsedImport | null {
   const o = raw as Record<string, unknown>;
   const str = (v: unknown): string =>
     typeof v === "string" ? v : "";
-  const imageUrls = Array.isArray(o.imageUrls)
-    ? o.imageUrls.filter((u): u is string => typeof u === "string").slice(0, 4)
-    : [];
+  // Image/avatar field names: v5 bookmarklets and the browser extension send
+  // `images` / `avatar`; older payloads used `imageUrls` / `avatarUrl`.
+  const rawImages = Array.isArray(o.imageUrls)
+    ? o.imageUrls
+    : Array.isArray(o.images)
+      ? o.images
+      : [];
+  const imageUrls = rawImages
+    .filter((u): u is string => typeof u === "string")
+    .slice(0, 4);
   // v5 bookmarklets send the quoted post as `q`; older ones send nothing.
   const q = o.q && typeof o.q === "object" ? (o.q as Record<string, unknown>) : null;
   const quoted: ParsedQuotedPost | null = q
@@ -375,7 +382,7 @@ function coerceImport(raw: unknown): ParsedImport | null {
         : o.verified === "gold" || o.verified === true
           ? "gold"
           : null,
-    avatarUrl: str(o.avatarUrl),
+    avatarUrl: str(o.avatarUrl) || str(o.avatar),
     text: cleanDescription(str(o.text)),
     timestamp: str(o.timestamp),
     imageUrls,

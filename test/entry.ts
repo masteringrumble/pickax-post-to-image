@@ -613,6 +613,14 @@ async function main() {
     assert.ok(back, "hash parsed");
     assert.equal(back!.username, "MisfitElectronicGaming");
     assert.equal(back!.postId, "707864");
+    // v5 bookmarklet field names (avatar/images) must survive the round-trip.
+    assert.ok(
+      back!.avatarUrl.includes("img.pickax.com/user-8356"),
+      `avatar round-trips (got ${back!.avatarUrl})`
+    );
+    assert.deepEqual(back!.imageUrls, [
+      "https://img.pickax.com/post-1234/abcd.jpeg",
+    ]);
     delete (globalThis as any).window;
     console.log("ok  bookmarklet end-to-end (extract -> hash -> parse back)");
   }
