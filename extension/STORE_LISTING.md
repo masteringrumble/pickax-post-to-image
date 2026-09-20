@@ -26,8 +26,10 @@
 > PRIVACY
 > No accounts, no analytics, no tracking. The extension reads the post only
 > on your device and only when you click the button; the image is rendered
-> locally in your browser and saved to your downloads. Nothing is stored
-> or sent anywhere else.
+> in your browser and saved to your downloads. Post images that block
+> cross-site loading are fetched through our own image proxy (which stores
+> nothing). Full policy:
+> https://github.com/masteringrumble/pickax-post-to-image/blob/main/extension/PRIVACY.md
 >
 > The companion web tool is free and open source:
 > https://github.com/masteringrumble/pickax-post-to-image
@@ -42,28 +44,42 @@
 - `host_permissions: https://pickax.com/*` — read the Pickax post page the
   user asked to convert. Only used on click, on `pickax.com/post/*` pages.
 - `scripting` — fallback re-injection when the tab predates the install.
+- `offscreen` (Chromium zip only) — renders the post image in a hidden
+  document. On Firefox the same render runs in a hidden extension tab
+  instead; the Firefox manifest omits this permission.
+- `downloads` — saves the generated PNG to the user's device.
 
 ## Publishing checklist
 
-The code is store-ready (one MV3 zip for all stores). Publishing needs the
-store developer accounts, which only you can create — here's each step.
+`bash extension/package.sh` builds three files in `dist-ext/`:
+- `pickax-post-to-image-chromium-<version>.zip` — Chrome Web Store,
+  Edge Add-ons, Opera addons (same MV3 zip for all three).
+- `pickax-post-to-image-firefox-<version>.zip` — Firefox AMO only
+  (event-page background, no `offscreen` permission, hidden-tab render).
+- `pickax-post-to-image-sources-<version>.zip` — unminified renderer
+  sources + build instructions, for AMO's review of the minified bundles.
+
+Publishing needs the store developer accounts, which only you can create —
+here's each step.
 
 ### 1. Chrome Web Store (covers Chrome, Brave, and most Chromium browsers)
 - Register at https://chromewebstore.google.com/devconsole — one-time $5
   developer fee (Google's charge, unchanged for years).
-- Upload `dist-ext/pickax-post-to-image-extension-1.0.0.zip`.
+- Upload the **chromium** zip.
 - Fill in the listing copy above; set visibility Public; submit for review
   (typically a few days).
 
 ### 2. Microsoft Edge Add-ons
 - Register free at https://partner.microsoft.com/dashboard (Microsoft account).
-- Upload the same zip at
+- Upload the **chromium** zip at
   https://partner.microsoft.com/dashboard/microsoftedge/publications/overview.
 - Same listing copy; submit for review.
 
 ### 3. Firefox Add-ons (AMO)
 - Register free at https://addons.mozilla.org/developers/.
-- Upload the same zip. Choose distribution:
+- Upload the **firefox** zip, and attach the **sources** zip when AMO asks
+  for the source of the minified code (or point the reviewer at
+  `extension/render-src/` on GitHub). Choose distribution:
   - **"On this site"** — public listing on addons.mozilla.org.
   - **"On your own"** — Mozilla signs it and gives you a `.xpi` for
     self-hosting/sideloading (the alternative-distribution route, since
@@ -72,10 +88,10 @@ store developer accounts, which only you can create — here's each step.
 
 ### 4. Opera addons
 - Register free at https://addons.opera.com/developer/.
-- Upload the same zip; same listing copy; submit for review.
+- Upload the **chromium** zip; same listing copy; submit for review.
 
 ### 5. Alternative / sideload distribution
-- **GitHub Release** (this repo): attach the zip from `package.sh` —
+- **GitHub Release** (this repo): attach both store zips from `package.sh` —
   Chromium users can **Load unpacked** in developer mode (see README.md).
 - **Firefox unlisted**: use AMO's "On your own" option to get a signed
   `.xpi`, then host it on the release page.
@@ -84,4 +100,4 @@ store developer accounts, which only you can create — here's each step.
 
 - Add the store links to the web app's "More ways" section and this README.
 - Each update: bump `version` in `manifest.json`, re-run `package.sh`,
-  re-upload to each store, tag `extension-vX.Y.Z`.
+  re-upload the matching zip to each store, tag `extension-vX.Y.Z`.

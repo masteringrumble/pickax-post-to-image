@@ -1,0 +1,13 @@
+<!doctype html>
+<!-- Pickax Post to Image — hidden-tab render page.
+     Used where the offscreen API is unavailable (Firefox, older Chromium):
+     the background opens this extension page in a hidden tab with the
+     render request in the URL hash; render-page.js renders the PNG and
+     either downloads it or sends the data URL back to the requesting tab,
+     then closes its own tab. -->
+<html>
+  <head><meta charset="utf-8" /></head>
+  <body>
+    <script src="render-page.js"></script>
+  </body>
+</html>

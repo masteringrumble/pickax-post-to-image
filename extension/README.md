@@ -24,28 +24,33 @@ panel pops up right on the page with a live preview and the same "Show in
 image" toggles as the website (Logo, Views, Post images, Site embed,
 Picks & axes — shown only when the post has that content). The preview
 re-renders as toggles flip (remote images are cached, so flips are instant).
-Download renders the final PNG via the offscreen document and saves it with
-chrome.downloads. Everything happens inside the extension; the site never
-opens. Esc cancels. No buttons are injected into posts. On non-Pickax
-pages the toolbar button just opens the web app.
+Download renders the final PNG — via the offscreen document on Chromium,
+via a hidden render tab on Firefox — and saves it with chrome.downloads.
+Everything happens inside the extension; the site never opens. Esc cancels.
+No buttons are injected into posts. On non-Pickax pages the toolbar button
+just opens the web app.
 
 ## Test
 
 ```sh
 NODE_PATH=./node_modules node extension/test-content.cjs
+node extension/test-background.cjs
 node --check extension/content.js && node --check extension/background.js
 ```
 
 ## Package
 
 ```sh
-./extension/package.sh
-# -> dist-ext/pickax-post-to-image-extension-1.0.0.zip
+bash extension/package.sh
+# -> dist-ext/pickax-post-to-image-chromium-<version>.zip  (Chrome, Edge, Opera)
+# -> dist-ext/pickax-post-to-image-firefox-<version>.zip    (Firefox AMO)
+# -> dist-ext/pickax-post-to-image-sources-<version>.zip     (unminified sources for AMO review)
 ```
 
-The zip contains `manifest.json`, `background.js`, `content.js`, `icons/`
-at the top level — the layout every store expects. The same zip uploads to
-all four stores.
+Each zip contains `manifest.json`, `background.js`, `content.js`, `icons/`
+at the top level — the layout every store expects. The Chromium zip also
+carries the offscreen renderer; the Firefox zip uses a hidden-tab renderer
+instead (see STORE_LISTING.md for the per-store upload guide).
 
 ## Load unpacked (sideload, any Chromium browser)
 

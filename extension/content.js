@@ -24,6 +24,36 @@
 
   var RENDER_MSG = "pickax-post-to-image:render";
   var PREVIEW_MSG = "pickax-post-to-image:preview";
+  var PREVIEW_TAB_RESULT = "pickax-post-to-image:preview-tab-result";
+  var RENDER_TAB_DONE = "pickax-post-to-image:render-tab-done";
+
+  // Pending results from hidden-tab renders (browsers without the
+  // offscreen API, e.g. Firefox): the background spawns a hidden render
+  // tab that replies directly to this tab. reqId -> { resolve, timer }.
+  var pendingTabResults = {};
+  if (api && api.runtime && api.runtime.onMessage) {
+    api.runtime.onMessage.addListener(function (msg) {
+      if (!msg) return;
+      if (msg.type === PREVIEW_TAB_RESULT || msg.type === RENDER_TAB_DONE) {
+        var pending = pendingTabResults[msg.reqId];
+        if (pending) {
+          delete pendingTabResults[msg.reqId];
+          if (pending.timer) clearTimeout(pending.timer);
+          pending.resolve(msg);
+        }
+      }
+    });
+  }
+  function waitForTabResult(reqId, timeoutMs) {
+    return new Promise(function (resolve) {
+      var timer = setTimeout(function () {
+        delete pendingTabResults[reqId];
+        resolve({ ok: false, error: "render-timeout" });
+      }, timeoutMs || 90000);
+      pendingTabResults[reqId] = { resolve: resolve, timer: timer };
+    });
+  }
+  var ICON_DATA_URL = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAABvUlEQVR4nMVXy07DMBCcrTgln8alQghFfVBViH+Az+BQceLNASoOiCMH+Krm6OUQO3H8TJzQWlpFdbI74/V4uya4xs+OwUCyCc98kZMJ1Z74HQgcAtdt3hCZ7B2cAbzsuE1gn+DKnioSFYF9gysDQP8muI42OSQ4GDjq8hEfZ0gd9FoOy8AQcADgRRaMT/j2a0CB05e2ip5p56WM8ejORDgD9TJksGkGPgmvKBYjmQBPm63g0x4kQgREVwIC9hhKQPTMAH2U9U96Dys7SkDTUfgYGs607QHsI2CI2J8B4XBOMT2G4wS5CQiHszQuKgHyzBYir+S7dWYT8Bxfm4D+oUGAi+ok8Ew+tSLDKzm3ls+LLCxCJwGTpeaswAFZXtWr86wGBwC6K1t+MQKET1kJHSniM7sMm7XdAlfzl21f2oQqoa+8RsDBAD2UFrjL178FodoeAa9JmOACoNuyHaCTBjwEYn+pPh3RxtBDKoEU8K4xCNtwS8aLYf0AANCNP4PRhoSeS3fUEcCrDLwduiktcjoUOK5ySr8XjNARA+piMu+ZhTHAr6v7YXM3XHYkMSI4YN6O1bj3CHOEPTeh/gAImmYY9b2WXQAAAABJRU5ErkJggg=="; // inlined icon-32.png (no web_accessible_resources needed)
 
   // An engagement button (pick / axe / comment): a real page button holding
   // an icon SVG plus a numeric count. Color-agnostic — Pickax restyles these
@@ -573,10 +603,7 @@
     document.body.appendChild(pickHL);
 
     pickPill = document.createElement("div");
-    var iconUrl =
-      api && api.runtime && api.runtime.getURL
-        ? api.runtime.getURL("icons/icon-32.png")
-        : "";
+    var iconUrl = ICON_DATA_URL;
     pickPill.innerHTML =
       (iconUrl
         ? '<img src="' +
@@ -756,10 +783,7 @@
     var head = document.createElement("div");
     head.style.cssText =
       "display:flex;align-items:center;gap:10px;margin-bottom:14px;";
-    var iconUrl =
-      api && api.runtime && api.runtime.getURL
-        ? api.runtime.getURL("icons/icon-32.png")
-        : "";
+    var iconUrl = ICON_DATA_URL;
     if (iconUrl) {
       var icon = document.createElement("img");
       icon.src = iconUrl;
@@ -810,19 +834,31 @@
         .sendMessage({ type: PREVIEW_MSG, payload: payload, options: opts })
         .then(function (res) {
           if (seq !== previewSeq) return; // a newer render won
-          if (res && res.ok && res.dataUrl) {
-            if (!previewShown) {
-              previewWrap.textContent = "";
-              previewWrap.appendChild(previewImg);
-              previewShown = true;
-            }
-            previewImg.src = res.dataUrl;
+          if (res && res.viaTab) {
+            // No offscreen API (e.g. Firefox): a hidden render tab replies
+            // directly to this tab.
+            waitForTabResult(res.reqId).then(function (result) {
+              if (seq !== previewSeq) return; // a newer render won
+              applyPreviewResult(result);
+            });
+            return;
           }
-          previewImg.style.opacity = "1";
+          applyPreviewResult(res);
         })
         .catch(function () {
           previewImg.style.opacity = "1";
         });
+    }
+    function applyPreviewResult(res) {
+      if (res && res.ok && res.dataUrl) {
+        if (!previewShown) {
+          previewWrap.textContent = "";
+          previewWrap.appendChild(previewImg);
+          previewShown = true;
+        }
+        previewImg.src = res.dataUrl;
+      }
+      previewImg.style.opacity = "1";
     }
     function schedulePreview(immediate) {
       if (previewTimer) clearTimeout(previewTimer);
@@ -887,6 +923,19 @@
       api.runtime
         .sendMessage({ type: RENDER_MSG, payload: payload, options: opts })
         .then(function (res) {
+          if (res && res.viaTab) {
+            // No offscreen API (e.g. Firefox): a hidden render tab
+            // downloads the PNG and replies directly to this tab.
+            waitForTabResult(res.reqId).then(function (result) {
+              closePanel();
+              toast(
+                result && result.ok
+                  ? "Image downloaded ✓"
+                  : "Couldn't generate the image."
+              );
+            });
+            return;
+          }
           closePanel();
           toast(
             res && res.ok ? "Image downloaded ✓" : "Couldn't generate the image."

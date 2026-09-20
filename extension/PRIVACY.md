@@ -20,11 +20,18 @@ into posts — no buttons, no page changes — and the website never opens.
 - The extension reads a Pickax post **only on your device, only when you
   click a highlighted post in picker mode**. Nothing is read in the
   background.
-- The extracted post data is rendered locally in your browser (offscreen
-  document) into a PNG saved to your downloads. It is never sent anywhere
-  else.
-- **Nothing is stored** by the extension — no local storage, no cookies, no
-  servers, no third parties.
+- The extracted post data is rendered locally in your browser (a hidden
+  document on Chromium, a hidden tab on Firefox) into a PNG saved to your
+  downloads.
+- **Post images and avatars:** some images on Pickax don't allow other
+  sites to load them directly, so the extension fetches those through our
+  own image proxy at
+  `https://pickax-post-api.masteringrumble.workers.dev`
+  (first-party, run by the same developer). The proxy sees the image URL
+  while fetching it and **stores nothing** — no logs of your activity, no
+  copies of the images.
+- **Nothing is stored** by the extension — no local storage, no cookies,
+  no servers beyond the image proxy above, no third parties.
 
 ## Permissions used
 
@@ -33,7 +40,9 @@ into posts — no buttons, no page changes — and the website never opens.
   the toolbar button.
 - **`scripting`** — fallback that loads the picker if the tab was open
   before the extension was installed.
-- **`offscreen`** — renders the post image in a hidden document.
+- **`offscreen`** (Chromium only) — renders the post image in a hidden
+  document. On Firefox the same render runs in a hidden extension tab
+  instead; no extra permission is needed for that.
 - **`downloads`** — saves the generated PNG to your device.
 
 ## Contact

@@ -329,13 +329,38 @@ ${feedCard("222222", "bob", "Bob B", "u-bob/b.jpeg", "3 hours ago", "p-222/photo
   // Stub the extension API: icon URL for the hint pill + capture the
   // preview/render messages the panel sends.
   var sentMsgs = [];
+  var useViaTab = false; // flip to simulate browsers without the offscreen API
+  var lastReqId = 0;
+  var onMsgListeners = [];
+  function fireRuntimeMessage(msg) {
+    onMsgListeners.forEach(function (fn) {
+      try {
+        fn(msg);
+      } catch (e) {
+        /* one listener must not break the others */
+      }
+    });
+  }
   globalThis.chrome = {
     runtime: {
       getURL: function (p) {
         return "chrome-extension://fakeid/" + p;
       },
+      onMessage: {
+        addListener: function (fn) {
+          onMsgListeners.push(fn);
+        },
+      },
       sendMessage: function (msg) {
         sentMsgs.push(msg);
+        if (
+          useViaTab &&
+          (msg.type === "pickax-post-to-image:preview" ||
+            msg.type === "pickax-post-to-image:render")
+        ) {
+          lastReqId += 1;
+          return Promise.resolve({ ok: true, viaTab: true, reqId: lastReqId });
+        }
         if (msg.type === "pickax-post-to-image:preview") {
           return Promise.resolve({
             ok: true,
@@ -489,6 +514,65 @@ ${feedCard("222222", "bob", "Bob B", "u-bob/b.jpeg", "3 hours ago", "p-222/photo
     null,
     "panel closed after Download"
   );
+
+  // No-offscreen browsers (e.g. Firefox): the background answers viaTab
+  // and a hidden render tab replies directly to this tab.
+  useViaTab = true;
+  pickerF.start();
+  innerBtn.dispatchEvent(
+    new domF.window.MouseEvent("mouseover", { bubbles: true })
+  );
+  await new Promise((r) => setTimeout(r, 40));
+  innerBtn.dispatchEvent(new domF.window.MouseEvent("click", { bubbles: true }));
+  await new Promise((r) => setTimeout(r, 30));
+  const viaPreviewReq = sentMsgs[sentMsgs.length - 1];
+  assert.equal(
+    viaPreviewReq.type,
+    "pickax-post-to-image:preview",
+    "viaTab preview requested"
+  );
+  const previewReqId = lastReqId;
+  const panel2 = docF.getElementById("pickax-post-to-image-panel-backdrop");
+  assert.ok(panel2, "options panel shown (viaTab round)");
+  fireRuntimeMessage({
+    type: "pickax-post-to-image:preview-tab-result",
+    reqId: previewReqId,
+    ok: true,
+    dataUrl: "data:image/png;base64,VIATAB",
+  });
+  await new Promise((r) => setTimeout(r, 30));
+  const previewImg2 = panel2.querySelector("img[alt='Post image preview']");
+  assert.ok(
+    previewImg2 &&
+      previewImg2.src.indexOf("data:image/png;base64,VIATAB") === 0,
+    "preview painted from the hidden-tab result"
+  );
+  // Download via the hidden tab: the panel waits for the tab's reply.
+  panel2.querySelector("[data-ppi-download]").click();
+  await new Promise((r) => setTimeout(r, 30));
+  const viaRenderReq = sentMsgs[sentMsgs.length - 1];
+  assert.equal(
+    viaRenderReq.type,
+    "pickax-post-to-image:render",
+    "viaTab render requested"
+  );
+  const renderReqId = lastReqId;
+  assert.ok(
+    docF.getElementById("pickax-post-to-image-panel-backdrop"),
+    "panel waits for the hidden-tab download"
+  );
+  fireRuntimeMessage({
+    type: "pickax-post-to-image:render-tab-done",
+    reqId: renderReqId,
+    ok: true,
+  });
+  await new Promise((r) => setTimeout(r, 30));
+  assert.equal(
+    docF.getElementById("pickax-post-to-image-panel-backdrop"),
+    null,
+    "panel closed after the hidden-tab download"
+  );
+  useViaTab = false;
 
   // Esc cancels picker mode without sending anything.
   const sentBefore = sentMsgs.length;

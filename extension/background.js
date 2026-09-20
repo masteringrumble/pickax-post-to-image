@@ -9,8 +9,11 @@
  *    toggles as the website); on Download it sends the post + options
  *    here. The worker renders it in a hidden offscreen document (real DOM
  *    + canvas + webfonts, same renderer as the web app) and downloads the
- *    PNG directly. Where the offscreen API is unavailable, it falls back
- *    to opening the web app with the post pre-filled.
+ *    PNG directly. Where the offscreen API is unavailable (Firefox, older
+ *    Chromium), it opens a hidden extension tab (render.html) that renders
+ *    and replies directly to the requesting tab — the worker keeps no
+ *    state, so nothing is lost if the event page suspends mid-render.
+ *    As a last resort it opens the web app with the post pre-filled.
  * 2. Toolbar button anywhere else: just opens the web app.
  *
  * No data is collected, stored, or transmitted by this extension itself.
@@ -25,6 +28,7 @@
   var RENDER_MSG = "pickax-post-to-image:render";
   var PREVIEW_MSG = "pickax-post-to-image:preview";
   var OFFSCREEN_MSG = "pickax-post-to-image:render-offscreen";
+  var nextReqId = 1;
 
   function openApp(payload) {
     var url = APP_URL;
@@ -49,6 +53,30 @@
       files: ["content.js"],
     });
     await api.tabs.sendMessage(tabId, { type: PICK_MSG });
+  }
+
+  // No offscreen API (Firefox, older Chromium): open a hidden extension
+  // tab that renders and replies DIRECTLY to the requesting content-script
+  // tab. The worker keeps no state, so nothing is lost if the event page
+  // suspends mid-render. Resolves { ok, viaTab, reqId } — the render tab's
+  // reply arrives as a separate message to the requesting tab.
+  function renderViaHiddenTab(payload, options, mode, replyToTab) {
+    var reqId = nextReqId++;
+    var url =
+      api.runtime.getURL("render.html") +
+      "#d=" +
+      encodeURIComponent(
+        JSON.stringify({
+          payload: payload,
+          options: options,
+          mode: mode,
+          reqId: reqId,
+          replyToTab: replyToTab,
+        })
+      );
+    return api.tabs.create({ url: url, active: false }).then(function () {
+      return { ok: true, viaTab: true, reqId: reqId };
+    });
   }
 
   // Render the extracted post in the offscreen document (with the user's
@@ -86,34 +114,75 @@
     return { ok: false, error: "offscreen-unavailable" };
   }
 
-  // Full download flow. Falls back to opening the web app when the
-  // offscreen API is unavailable (older browsers).
-  async function renderToDownload(payload, options) {
+  // Full download flow. Without the offscreen API it goes through a hidden
+  // render tab; as a last resort it opens the web app with the post.
+  async function handleRender(payload, options, replyToTab, sendResponse) {
     var rendered = await renderViaOffscreen(payload, options);
     if (rendered.ok && rendered.dataUrl) {
-      await api.downloads.download({
-        url: rendered.dataUrl,
-        filename: rendered.filename || "pickax-post.png",
-        saveAs: false,
-      });
-      return { ok: true };
+      try {
+        await api.downloads.download({
+          url: rendered.dataUrl,
+          filename: rendered.filename || "pickax-post.png",
+          saveAs: false,
+        });
+        sendResponse({ ok: true });
+      } catch (e) {
+        sendResponse({ ok: false, error: "download-failed" });
+      }
+      return;
+    }
+    if (rendered.error === "offscreen-unavailable" && replyToTab != null) {
+      try {
+        sendResponse(
+          await renderViaHiddenTab(payload, options, "download", replyToTab)
+        );
+        return;
+      } catch (e) {
+        /* fall through to the web-app fallback */
+      }
     }
     if (rendered.error === "offscreen-unavailable") {
-      await openApp(payload);
-      return { ok: true, opened: true };
+      try {
+        await openApp(payload);
+        sendResponse({ ok: true, opened: true });
+      } catch (e) {
+        sendResponse({ ok: false, error: "open-failed" });
+      }
+      return;
     }
-    return { ok: false, error: rendered.error };
+    sendResponse({ ok: false, error: rendered.error });
+  }
+
+  // Live preview flow. Without the offscreen API it goes through a hidden
+  // render tab that replies directly to the requesting tab.
+  async function handlePreview(payload, options, replyToTab, sendResponse) {
+    var rendered = await renderViaOffscreen(payload, options);
+    if (rendered.ok) {
+      sendResponse({ ok: true, dataUrl: rendered.dataUrl });
+      return;
+    }
+    if (rendered.error === "offscreen-unavailable" && replyToTab != null) {
+      try {
+        sendResponse(
+          await renderViaHiddenTab(payload, options, "preview", replyToTab)
+        );
+        return;
+      } catch (e) {
+        /* fall through */
+      }
+    }
+    sendResponse({ ok: false, error: rendered.error || "preview-failed" });
   }
 
   api.runtime.onMessage.addListener(function (msg, sender, sendResponse) {
+    var replyToTab =
+      sender && sender.tab && sender.tab.id != null ? sender.tab.id : null;
     if (msg && msg.type === RENDER_MSG) {
-      renderToDownload(msg.payload, msg.options).then(sendResponse);
+      handleRender(msg.payload, msg.options, replyToTab, sendResponse);
       return true; // async response
     }
     if (msg && msg.type === PREVIEW_MSG) {
-      renderViaOffscreen(msg.payload, msg.options).then(function (r) {
-        sendResponse({ ok: r.ok, dataUrl: r.dataUrl });
-      });
+      handlePreview(msg.payload, msg.options, replyToTab, sendResponse);
       return true; // async response
     }
     return undefined;
