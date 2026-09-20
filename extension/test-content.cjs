@@ -411,4 +411,102 @@ ${feedCard("222222", "bob", "Bob B", "u-bob/b.jpeg", "3 hours ago", "p-222/photo
   assert.deepEqual(f2.imageUrls, ["https://img.pickax.com/p-222/photo.jpeg"]);
   console.log("ok  content.js feed cards: per-post buttons + scoped extraction");
 }
+
+// Payload miss: the per-post button's card-scoped extraction must fall back
+// to the rendered DOM (.text-content + display-name link) instead of
+// producing an empty card. Regression test for post 715229, whose download
+// came out with no post text and no display name at all.
+{
+  const nuxtMiss = JSON.stringify([{ feed: [] }]); // payload lacks the post
+  const domText =
+    "There\u2019s always going to be bad actors.\n\nSecond paragraph here.";
+  const htmlMiss = `<!DOCTYPE html><html><head>
+<meta property="og:title" content="Pickax">
+</head><body>
+<div class="card" id="card-715229">
+<a href="/post/715229" class="absolute top-0 left-0 w-full h-full cursor-pointer z-0"></a>
+<div><a href="/JeffDornik">Jeff Dornik</a></div>
+<div><a href="/JeffDornik">@JeffDornik</a><span title="Sep 20, 2026">5 minutes ago</span></div>
+<a href="/JeffDornik"><img src="https://img.pickax.com/user-3/avatar.jpeg" class="rounded-full"></a>
+<div class="relative z-10 text-light2 font-light my-5 block w-full cursor-pointer"><div class="text-content overflow-clip">${domText}</div></div>
+<div class="actions">
+<button class="relative flex"><svg><defs><linearGradient><stop stop-color="#FD5E5E"/><stop stop-color="#FDCF5E"/></linearGradient></defs></svg><div class="flex gap-1"><div>6</div></div></button>
+<button class="relative flex"><svg><path d="M0 0h24v24H0z"/></svg></button>
+</div>
+<span title="Post views" aria-label="Post views: 11">11</span>
+</div>
+<script id="__NUXT_DATA__" type="application/json">${nuxtMiss}</script>
+</body></html>`;
+  const domM = new JSDOM(htmlMiss, { url: "https://pickax.com/" });
+  delete globalThis.__pickaxPostToImageInjected; // allow re-eval in the test harness
+  const factoryM = new domM.window.Function(
+    "document",
+    "location",
+    src + "\nreturn globalThis.__pickaxExtractPost;"
+  );
+  const extractM = factoryM(domM.window.document, domM.window.location);
+  const cardM = domM.window.document.getElementById("card-715229");
+  const m1 = extractM(cardM, "715229");
+  assert.equal(m1.postId, "715229");
+  assert.equal(m1.username, "JeffDornik");
+  assert.equal(
+    m1.displayName,
+    "Jeff Dornik",
+    "display name falls back to the DOM name link"
+  );
+  assert.equal(
+    m1.text,
+    domText,
+    "post text falls back to the rendered .text-content"
+  );
+  assert.equal(m1.picks, "6");
+  assert.equal(m1.views, "11");
+  assert.equal(
+    m1.avatarUrl,
+    "https://img.pickax.com/user-3/avatar.jpeg",
+    "author avatar still resolved"
+  );
+  console.log("ok  content.js DOM fallback when the payload walk misses");
+
+  // Precedence: when the payload delivers, it wins over the DOM text/name.
+  const nuxtP = JSON.stringify([
+    { post: 1 },
+    { id: 715230, content: 2, user: 3 },
+    "Payload <b>full</b> text",
+    {
+      fullname: "Payload Name",
+      username: "jeffdornik",
+      avatar: "user-3/a.jpeg",
+    },
+  ]);
+  const htmlP = `<!DOCTYPE html><html><head>
+<meta property="og:title" content="Pickax">
+</head><body>
+<div class="card" id="card-715230">
+<a href="/post/715230" class="absolute top-0 left-0 w-full h-full cursor-pointer z-0"></a>
+<div><a href="/jeffdornik">DOM Name</a></div>
+<div><a href="/jeffdornik">@jeffdornik</a></div>
+<a href="/jeffdornik"><img src="https://img.pickax.com/user-3/a.jpeg" class="rounded-full"></a>
+<div class="relative z-10 text-light2 font-light my-5 block w-full cursor-pointer"><div class="text-content overflow-clip">DOM stub text</div></div>
+</div>
+<script id="__NUXT_DATA__" type="application/json">${nuxtP}</script>
+</body></html>`;
+  const domP = new JSDOM(htmlP, { url: "https://pickax.com/" });
+  delete globalThis.__pickaxPostToImageInjected; // allow re-eval in the test harness
+  const factoryP = new domP.window.Function(
+    "document",
+    "location",
+    src + "\nreturn globalThis.__pickaxExtractPost;"
+  );
+  const extractP = factoryP(domP.window.document, domP.window.location);
+  const cardP = domP.window.document.getElementById("card-715230");
+  const m2 = extractP(cardP, "715230");
+  assert.equal(m2.text, "Payload full text", "payload text wins over DOM");
+  assert.equal(
+    m2.displayName,
+    "Payload Name",
+    "payload fullname wins over DOM name"
+  );
+  console.log("ok  content.js payload takes precedence over the DOM fallback");
+}
 console.log("\nALL EXTENSION TESTS PASSED");

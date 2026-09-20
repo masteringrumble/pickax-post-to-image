@@ -179,21 +179,29 @@
       if (pm0 && !o.postId) o.postId = pm0[1];
     }
 
-    // Author row: the @username link; the verification seal sits beside the
-    // display-name link (same href, non-@ text) in the header container.
+    // Author row: the @username link; the display-name link (same href,
+    // non-@ text) sits beside the verification seal in the header container.
     Array.prototype.forEach.call(qa('a[href^="/"]'), function (a) {
       var t = (a.textContent || "").trim();
       if (t.charAt(0) === "@" && t.length > 1) {
         if (!o.username) o.username = t.slice(1).trim();
+        var dn = null;
+        Array.prototype.forEach.call(
+          qa('a[href="' + a.getAttribute("href") + '"]'),
+          function (x) {
+            var xt = (x.textContent || "").trim();
+            if (xt && xt.charAt(0) !== "@" && !dn) dn = x;
+          }
+        );
+        // Display-name fallback for card-scoped extraction (feed cards and
+        // the per-post button), where the og:title default doesn't apply.
+        // The payload walk overwrites this with the authoritative fullname
+        // when it succeeds.
+        if (dn && !o.displayName) {
+          var dnt = (dn.textContent || "").trim();
+          if (dnt && dnt.length < 80) o.displayName = dnt;
+        }
         if (!o.verified) {
-          var dn = null;
-          Array.prototype.forEach.call(
-            qa('a[href="' + a.getAttribute("href") + '"]'),
-            function (x) {
-              var xt = (x.textContent || "").trim();
-              if (xt && xt.charAt(0) !== "@" && !dn) dn = x;
-            }
-          );
           var pe = dn ? dn.parentElement : null;
           if (pe && pe.innerHTML.indexOf("12.7893 4.26666") > -1) {
             var ph = pe.innerHTML.toLowerCase();
@@ -332,6 +340,7 @@
 
     // Full post body from the page payload (og:description is truncated).
     var nd = document.getElementById("__NUXT_DATA__");
+    var textFromPayload = false;
     if (nd && o.postId) {
       try {
         var A = JSON.parse(nd.textContent || "");
@@ -356,7 +365,10 @@
           if (tgt) {
             var u = tgt.user || {},
               ct = cleanText(tgt.content);
-            if (ct) o.text = ct;
+            if (ct) {
+              o.text = ct;
+              textFromPayload = true;
+            }
             if (u.fullname) o.displayName = u.fullname;
             if (u.username)
               o.username = String(u.username).replace(/^@+/, "");
@@ -420,6 +432,21 @@
         }
       } catch (e) {
         /* fall back to the meta-tag fields above */
+      }
+    }
+
+    // DOM fallback for the post body. The payload walk can miss — feed
+    // payload shape, logged-in page differences, or a stale SPA payload —
+    // but the card always renders the full post text visibly in
+    // .text-content (Pickax's real post-body container). Scoped to the
+    // card so feed cards never steal a neighbor's text. This also beats
+    // the truncated og:description stub on post pages when the payload
+    // didn't deliver.
+    if (!textFromPayload) {
+      var tc = q(".text-content");
+      if (tc) {
+        var dt = cleanText(tc.innerHTML);
+        if (dt) o.text = dt;
       }
     }
 
