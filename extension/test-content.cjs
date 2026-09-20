@@ -1,6 +1,7 @@
-/* Smoke test for extension/content.js: runs the real content script against a
- * fixture Pickax post page (jsdom) and asserts the extracted payload matches
- * the v5 shape the app's #import= hash accepts.
+/* Smoke test for extension/content.js: runs the real content script against
+ * fixture Pickax pages (jsdom) and asserts the extracted payload matches
+ * the v5 shape the app's #import= hash accepts, plus the uBlock-style
+ * element picker (highlight, click-to-render, Esc, no per-post buttons).
  *
  * Run: NODE_PATH=./node_modules node extension/test-content.cjs
  */
@@ -258,10 +259,11 @@ console.log("ok  content.js extraction (quote post, badges, no-image rule)");
   console.log("ok  content.js extracts the link card (attachments vs link image)");
 }
 
-// Feed page: two post cards. Each card gets exactly one "Image" button with
-// its own post id, and card-scoped extraction must not bleed data between
-// cards (author, picks, images stay with their own post).
-{
+// Feed page: element picker. No buttons are injected into posts anymore —
+// the toolbar button puts the page in picker mode (uBlock Origin style):
+// hovering a card highlights it, clicking it renders + downloads, Esc
+// cancels. Card detection must stay scoped (no cross-card bleed).
+(async () => {
   const nuxtFeed = JSON.stringify([
     { feed: [1, 4] }, // 0
     { id: 111111, content: 2, user: 3 }, // 1
@@ -300,6 +302,7 @@ console.log("ok  content.js extraction (quote post, badges, no-image rule)");
 <div><a href="/${user}">@${user}</a><span title="Sep 20, 2026">${text}</span></div>
 <a href="/${user}"><img src="https://img.pickax.com/${av}" class="rounded-full object-cover w-10 h-10 min-w-10"></a>
 <img src="https://img.pickax.com/${img}" alt="post image">
+<div class="text-content overflow-clip">${name} wrote this.</div>
 <div class="actions">
 <button class="relative flex">${pickSvg}<div class="flex gap-1"><div>${o.picks}</div></div></button>
 ${axeBtn}
@@ -318,64 +321,116 @@ ${feedCard("222222", "bob", "Bob B", "u-bob/b.jpeg", "3 hours ago", "p-222/photo
 </div>
 <script id="__NUXT_DATA__" type="application/json">${nuxtFeed}</script>
 </body></html>`;
-  const domF = new JSDOM(htmlFeed, { url: "https://pickax.com/" });
+  const domF = new JSDOM(htmlFeed, {
+    url: "https://pickax.com/",
+    pretendToBeVisual: true, // lets requestAnimationFrame callbacks run
+  });
   delete globalThis.__pickaxPostToImageInjected; // allow re-eval in the test harness
-  // Stub the extension API so the button renders its icon image. (The test
-  // harness evals content.js with Node as globalThis, so stub it there.)
+  // Stub the extension API: icon URL for the hint pill + capture the render
+  // message the picker sends on click.
+  var sentMsgs = [];
   globalThis.chrome = {
     runtime: {
       getURL: function (p) {
         return "chrome-extension://fakeid/" + p;
+      },
+      sendMessage: function (msg) {
+        sentMsgs.push(msg);
+        return Promise.resolve({ ok: true });
       },
     },
   };
   const factoryF = new domF.window.Function(
     "document",
     "location",
-    src + "\nreturn globalThis.__pickaxExtractPost;"
+    src + "\nreturn { extract: globalThis.__pickaxExtractPost, picker: globalThis.__pickaxPicker };"
   );
-  const extractF = factoryF(domF.window.document, domF.window.location);
+  const fns = factoryF(domF.window.document, domF.window.location);
+  const extractF = fns.extract;
+  const pickerF = fns.picker;
+  const docF = domF.window.document;
+
+  // Nothing is injected into posts anymore.
+  assert.equal(
+    docF.querySelectorAll("[data-ppi-btn]").length,
+    0,
+    "no per-post buttons injected"
+  );
+  assert.ok(
+    pickerF && typeof pickerF.start === "function",
+    "picker API exposed"
+  );
+
+  // Card detection from deep inside the card (name link, action button).
+  const card1 = docF.getElementById("card-111111");
+  const card2 = docF.getElementById("card-222222");
+  assert.equal(
+    pickerF.cardFromElement(card1.querySelector(".actions button")),
+    card1,
+    "card found from an action button"
+  );
+  assert.equal(
+    pickerF.cardFromElement(card1.querySelector('a[href="/alice"]')),
+    card1,
+    "card found from the author link"
+  );
+  assert.equal(
+    pickerF.cardFromElement(docF.getElementById("feed")),
+    null,
+    "no card outside the cards"
+  );
+
+  // Picker mode: overlay + hint pill appear, crosshair cursor.
+  pickerF.start();
+  assert.equal(
+    docF.documentElement.style.cursor,
+    "crosshair",
+    "crosshair cursor in picker mode"
+  );
+  const pill = Array.prototype.find.call(
+    docF.querySelectorAll("div"),
+    function (d) {
+      return (d.textContent || "").indexOf("Click a post") !== -1;
+    }
+  );
+  assert.ok(pill, "hint pill shown");
+
+  // Hover card 1 -> click -> render message for post 111111, picker exits.
+  const innerBtn = card1.querySelector(".actions button");
+  innerBtn.dispatchEvent(
+    new domF.window.MouseEvent("mouseover", { bubbles: true })
+  );
+  await new Promise((r) => setTimeout(r, 40)); // let the rAF hover update run
+  innerBtn.dispatchEvent(new domF.window.MouseEvent("click", { bubbles: true }));
+  assert.equal(sentMsgs.length, 1, "one render message sent on pick");
+  assert.equal(sentMsgs[0].type, "pickax-post-to-image:render");
+  assert.equal(sentMsgs[0].payload.postId, "111111", "picked card 1");
+  assert.equal(sentMsgs[0].payload.username, "alice", "no cross-card bleed");
+  assert.equal(
+    sentMsgs[0].payload.text,
+    "Alice post text",
+    "payload text extracted for the picked card"
+  );
+  assert.equal(
+    docF.documentElement.style.cursor,
+    "",
+    "cursor restored after pick"
+  );
+
+  // Esc cancels picker mode without sending anything.
+  pickerF.start();
+  docF.dispatchEvent(
+    new domF.window.KeyboardEvent("keydown", { key: "Escape", bubbles: true })
+  );
+  assert.equal(sentMsgs.length, 1, "nothing sent on Esc");
+  assert.equal(
+    docF.documentElement.style.cursor,
+    "",
+    "cursor restored after Esc"
+  );
   delete globalThis.chrome; // don't leak the stub into other sections
 
-  // The content script auto-scans on load: one button per card.
-  const btns = domF.window.document.querySelectorAll("[data-ppi-btn]");
-  assert.equal(btns.length, 2, "one Image button per feed card");
-  const btnIds = Array.prototype.map
-    .call(btns, function (b) {
-      return b.getAttribute("data-ppi-btn");
-    })
-    .sort();
-  assert.deepEqual(btnIds, ["111111", "222222"], "buttons carry their card's post id");
-
-  // The button uses the site's light-blue icon image, not an emoji.
-  const btnImg = btns[0].querySelector("img");
-  assert.ok(btnImg, "button contains the brand icon image");
-  assert.ok(
-    btnImg.getAttribute("src").indexOf("icons/icon-32.png") !== -1,
-    "button icon is the extension's blue icon"
-  );
-  assert.ok(
-    btns[0].textContent.indexOf("📷") === -1,
-    "no camera emoji in the button"
-  );
-  assert.equal(
-    btns[0].parentElement.className,
-    "actions",
-    "button parks in the card's action row"
-  );
-  assert.equal(
-    btns[0].parentElement.lastElementChild,
-    btns[0],
-    "button sits after the row's trailing icon-only buttons"
-  );
-  assert.ok(
-    btns[0].style.position === "relative" && btns[0].style.zIndex === "1",
-    "button sits above the card's full-bleed overlay link"
-  );
-
-  // Scoped extraction: no cross-card bleed.
-  const card1 = domF.window.document.getElementById("card-111111");
-  const card2 = domF.window.document.getElementById("card-222222");
+  // Scoped extraction still works directly (no cross-card bleed).
   const f1 = extractF(card1, "111111");
   const f2 = extractF(card2, "222222");
   assert.equal(f1.postId, "111111");
@@ -409,104 +464,11 @@ ${feedCard("222222", "bob", "Bob B", "u-bob/b.jpeg", "3 hours ago", "p-222/photo
     "card 2 avatar is Bob's, not Alice's"
   );
   assert.deepEqual(f2.imageUrls, ["https://img.pickax.com/p-222/photo.jpeg"]);
-  console.log("ok  content.js feed cards: per-post buttons + scoped extraction");
-}
-
-// Payload miss: the per-post button's card-scoped extraction must fall back
-// to the rendered DOM (.text-content + display-name link) instead of
-// producing an empty card. Regression test for post 715229, whose download
-// came out with no post text and no display name at all.
-{
-  const nuxtMiss = JSON.stringify([{ feed: [] }]); // payload lacks the post
-  const domText =
-    "There\u2019s always going to be bad actors.\n\nSecond paragraph here.";
-  const htmlMiss = `<!DOCTYPE html><html><head>
-<meta property="og:title" content="Pickax">
-</head><body>
-<div class="card" id="card-715229">
-<a href="/post/715229" class="absolute top-0 left-0 w-full h-full cursor-pointer z-0"></a>
-<div><a href="/JeffDornik">Jeff Dornik</a></div>
-<div><a href="/JeffDornik">@JeffDornik</a><span title="Sep 20, 2026">5 minutes ago</span></div>
-<a href="/JeffDornik"><img src="https://img.pickax.com/user-3/avatar.jpeg" class="rounded-full"></a>
-<div class="relative z-10 text-light2 font-light my-5 block w-full cursor-pointer"><div class="text-content overflow-clip">${domText}</div></div>
-<div class="actions">
-<button class="relative flex"><svg><defs><linearGradient><stop stop-color="#FD5E5E"/><stop stop-color="#FDCF5E"/></linearGradient></defs></svg><div class="flex gap-1"><div>6</div></div></button>
-<button class="relative flex"><svg><path d="M0 0h24v24H0z"/></svg></button>
-</div>
-<span title="Post views" aria-label="Post views: 11">11</span>
-</div>
-<script id="__NUXT_DATA__" type="application/json">${nuxtMiss}</script>
-</body></html>`;
-  const domM = new JSDOM(htmlMiss, { url: "https://pickax.com/" });
-  delete globalThis.__pickaxPostToImageInjected; // allow re-eval in the test harness
-  const factoryM = new domM.window.Function(
-    "document",
-    "location",
-    src + "\nreturn globalThis.__pickaxExtractPost;"
-  );
-  const extractM = factoryM(domM.window.document, domM.window.location);
-  const cardM = domM.window.document.getElementById("card-715229");
-  const m1 = extractM(cardM, "715229");
-  assert.equal(m1.postId, "715229");
-  assert.equal(m1.username, "JeffDornik");
-  assert.equal(
-    m1.displayName,
-    "Jeff Dornik",
-    "display name falls back to the DOM name link"
-  );
-  assert.equal(
-    m1.text,
-    domText,
-    "post text falls back to the rendered .text-content"
-  );
-  assert.equal(m1.picks, "6");
-  assert.equal(m1.views, "11");
-  assert.equal(
-    m1.avatarUrl,
-    "https://img.pickax.com/user-3/avatar.jpeg",
-    "author avatar still resolved"
-  );
-  console.log("ok  content.js DOM fallback when the payload walk misses");
-
-  // Precedence: when the payload delivers, it wins over the DOM text/name.
-  const nuxtP = JSON.stringify([
-    { post: 1 },
-    { id: 715230, content: 2, user: 3 },
-    "Payload <b>full</b> text",
-    {
-      fullname: "Payload Name",
-      username: "jeffdornik",
-      avatar: "user-3/a.jpeg",
-    },
-  ]);
-  const htmlP = `<!DOCTYPE html><html><head>
-<meta property="og:title" content="Pickax">
-</head><body>
-<div class="card" id="card-715230">
-<a href="/post/715230" class="absolute top-0 left-0 w-full h-full cursor-pointer z-0"></a>
-<div><a href="/jeffdornik">DOM Name</a></div>
-<div><a href="/jeffdornik">@jeffdornik</a></div>
-<a href="/jeffdornik"><img src="https://img.pickax.com/user-3/a.jpeg" class="rounded-full"></a>
-<div class="relative z-10 text-light2 font-light my-5 block w-full cursor-pointer"><div class="text-content overflow-clip">DOM stub text</div></div>
-</div>
-<script id="__NUXT_DATA__" type="application/json">${nuxtP}</script>
-</body></html>`;
-  const domP = new JSDOM(htmlP, { url: "https://pickax.com/" });
-  delete globalThis.__pickaxPostToImageInjected; // allow re-eval in the test harness
-  const factoryP = new domP.window.Function(
-    "document",
-    "location",
-    src + "\nreturn globalThis.__pickaxExtractPost;"
-  );
-  const extractP = factoryP(domP.window.document, domP.window.location);
-  const cardP = domP.window.document.getElementById("card-715230");
-  const m2 = extractP(cardP, "715230");
-  assert.equal(m2.text, "Payload full text", "payload text wins over DOM");
-  assert.equal(
-    m2.displayName,
-    "Payload Name",
-    "payload fullname wins over DOM name"
-  );
-  console.log("ok  content.js payload takes precedence over the DOM fallback");
-}
-console.log("\nALL EXTENSION TESTS PASSED");
+  console.log("ok  content.js picker: highlight, click-to-render, Esc, scoped extraction");
+})().then(
+  () => console.log("\nALL EXTENSION TESTS PASSED"),
+  (e) => {
+    console.error(e);
+    process.exit(1);
+  }
+);

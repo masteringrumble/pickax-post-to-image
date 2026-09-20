@@ -2,12 +2,12 @@
  *
  * Runs on https://pickax.com/* pages. Two jobs:
  *
- * 1. Per-post "Make image" buttons: while scrolling the feed (or viewing a
- *    post page), every post card gets a small "Image" button in its action
- *    row. Clicking it extracts that post and generates the PNG right there —
- *    no need to open the website. The PNG downloads automatically.
- * 2. Toolbar-button support: answers the "extract" message the toolbar
- *    button sends on post pages, so it can open the web app pre-filled.
+ * 1. Element picker (uBlock Origin style): clicking the toolbar button puts
+ *    the page in picker mode — hovering a post card highlights it, clicking
+ *    it generates the PNG right there and downloads it automatically. No
+ *    buttons are injected into posts, no website visit needed. Esc cancels.
+ * 2. Post extraction: the payload + DOM extraction the picker (and the
+ *    toolbar fallback) uses to build the image.
  *
  * Privacy: nothing leaves the browser except the post data you explicitly
  * turn into an image. No accounts, no analytics, no background transmission.
@@ -21,18 +21,13 @@
   if (globalThis.__pickaxPostToImageInjected) return;
   globalThis.__pickaxPostToImageInjected = true;
 
-  var EXTRACT_MSG = "pickax-post-to-image:extract";
   var RENDER_MSG = "pickax-post-to-image:render";
-  var SEEN_ANCHOR = "data-ppi-seen";
-  var SCANNED_ROOT = "data-ppi-scanned";
-  var BTN_ATTR = "data-ppi-btn";
 
   // An engagement button (pick / axe / comment): a real page button holding
   // an icon SVG plus a numeric count. Color-agnostic — Pickax restyles these
   // icons (feed vs post page), so hex sniffing breaks across surfaces.
   function isEngagementButton(b) {
     if (!b || !b.innerHTML) return false;
-    if (b.hasAttribute && b.hasAttribute(BTN_ATTR)) return false; // ours
     if (b.innerHTML.indexOf("<svg") === -1) return false;
     return /(\d[\d,]*)/.test(b.textContent || "");
   }
@@ -464,226 +459,270 @@
   // Exposed for the Node smoke test (harmless in production).
   globalThis.__pickaxExtractPost = extractPost;
 
+  // Small transient status message, Pickax-styled. Used by the picker for
+  // feedback ("Rendering…", "Image downloaded ✓").
+  function toast(msg) {
+    try {
+      var old = document.getElementById("pickax-post-to-image-toast");
+      if (old && old.parentNode) old.parentNode.removeChild(old);
+      var d = document.createElement("div");
+      d.id = "pickax-post-to-image-toast";
+      d.textContent = msg;
+      d.style.cssText =
+        "position:fixed;left:50%;bottom:28px;transform:translateX(-50%);" +
+        "z-index:2147483647;pointer-events:none;white-space:nowrap;" +
+        "background:rgba(20,26,40,.96);color:#fff;font-size:14px;" +
+        "font-family:system-ui,sans-serif;padding:10px 18px;" +
+        "border-radius:9999px;border:1px solid #3EB1F9;" +
+        "box-shadow:0 8px 28px rgba(0,0,0,.55);";
+      document.body.appendChild(d);
+      setTimeout(function () {
+        if (d.parentNode) d.parentNode.removeChild(d);
+      }, 2600);
+    } catch (e) {
+      /* never break the page */
+    }
+  }  // -------------------------------------------------------------------------
+  // Element picker (uBlock Origin style)
   // -------------------------------------------------------------------------
-  // Per-post "Make image" buttons
-  // -------------------------------------------------------------------------
+  // Toolbar click -> PICK_MSG -> the page enters picker mode: hovering a
+  // post card highlights it, clicking it renders + downloads the image,
+  // Esc cancels. No buttons are injected into posts anymore.
+
+  var PICK_MSG = "pickax-post-to-image:pick";
+
+  var picking = false;
+  var hoverCard = null;
+  var pickHL = null; // highlight overlay
+  var pickPill = null; // hint pill
+  var pickRaf = 0;
+  var lastOverEvent = null;
+  var savedCursor = "";
+
+  // requestAnimationFrame doesn't exist in the Node test harness — fall
+  // back to running the hover update synchronously there.
+  var raf =
+    typeof requestAnimationFrame !== "undefined"
+      ? requestAnimationFrame
+      : function (fn) {
+          fn();
+          return 0;
+        };
 
   function postIdFromAnchor(a) {
     var m = (a.getAttribute("href") || "").match(/\/post\/(\d+)/);
     return m ? m[1] : "";
   }
 
-  // The post card is the smallest ancestor of the post link that holds the
-  // engagement buttons (pick "0083f5" / axe "dc1919" path colors). Walking up
-  // from the link, the first such ancestor is the card — never the feed.
-  function findCardRoot(anchor) {
-    var el = anchor.parentElement;
-    for (var i = 0; i < 12 && el && el !== document.body; i++) {
-      var btns = el.querySelectorAll("button");
-      for (var b = 0; b < btns.length; b++) {
-        if (isEngagementButton(btns[b])) return el;
-      }
-      el = el.parentElement;
+  // The post card is the smallest ancestor of any element inside it that
+  // holds both a /post/ link and the engagement buttons (pick / axe /
+  // comment). The link must be a DIRECT child (the card's full-bleed
+  // overlay anchor) — otherwise a feed-level container whose subtree merely
+  // contains cards would match too. Requiring the link also keeps us out of
+  // the action row itself (buttons but no link) and out of the header
+  // (link but no buttons).
+  function directPostLink(node) {
+    var kids = node.children;
+    for (var i = 0; i < kids.length; i++) {
+      var k = kids[i];
+      if (
+        k.tagName === "A" &&
+        /\/post\/\d+/.test(k.getAttribute("href") || "")
+      )
+        return k;
     }
-    return document.documentElement;
+    return null;
   }
 
-  function toast(msg) {
-    var t = document.createElement("div");
-    t.textContent = msg;
-    t.style.cssText =
-      "position:fixed;left:50%;bottom:28px;transform:translateX(-50%);" +
-      "background:#1B2334;color:#fff;font-size:14px;padding:10px 18px;" +
-      "border-radius:9999px;border:1px solid #3A4358;z-index:2147483647;" +
-      "font-family:system-ui,sans-serif;box-shadow:0 4px 16px rgba(0,0,0,.5);";
-    document.body.appendChild(t);
-    setTimeout(function () {
-      t.style.transition = "opacity .4s";
-      t.style.opacity = "0";
-      setTimeout(function () {
-        t.remove();
-      }, 450);
-    }, 2600);
+  function cardFromElement(el) {
+    var node = el && el.nodeType === 1 ? el : null;
+    for (var i = 0; i < 14 && node && node !== document.body; i++) {
+      var link = directPostLink(node);
+      var hasEng = false;
+      if (link) {
+        var btns = node.querySelectorAll("button");
+        for (var b = 0; b < btns.length; b++) {
+          if (isEngagementButton(btns[b])) {
+            hasEng = true;
+            break;
+          }
+        }
+      }
+      if (link && hasEng) return node;
+      node = node.parentElement;
+    }
+    return null;
   }
 
-  function onMakeImage(postId, cardRoot, btn) {
-    var old = btn.innerHTML;
-    btn.disabled = true;
-    btn.innerHTML = "Rendering…";
+  function postIdFromCard(card) {
+    var a = card.querySelector('a[href*="/post/"]');
+    return a ? postIdFromAnchor(a) : "";
+  }
+
+  function ensurePickerDom() {
+    if (pickHL) return;
+    pickHL = document.createElement("div");
+    pickHL.style.cssText =
+      "position:fixed;left:0;top:0;width:0;height:0;pointer-events:none;" +
+      "z-index:2147483646;display:none;" +
+      "outline:3px solid #3EB1F9;outline-offset:3px;border-radius:14px;" +
+      "box-shadow:0 0 0 6px rgba(62,177,249,.22),0 12px 40px rgba(0,0,0,.5);" +
+      "transition:left .12s ease,top .12s ease,width .12s ease,height .12s ease;";
+    document.body.appendChild(pickHL);
+
+    pickPill = document.createElement("div");
+    var iconUrl =
+      api && api.runtime && api.runtime.getURL
+        ? api.runtime.getURL("icons/icon-32.png")
+        : "";
+    pickPill.innerHTML =
+      (iconUrl
+        ? '<img src="' +
+          iconUrl +
+          '" alt="" style="width:18px;height:18px;border-radius:4px;' +
+          'vertical-align:-4px;margin-right:8px;pointer-events:none;">'
+        : "") +
+      "<span>Click a post to turn it into an image</span>" +
+      '<span style="opacity:.65;margin-left:10px;">Esc to cancel</span>';
+    pickPill.style.cssText =
+      "position:fixed;left:50%;top:18px;transform:translateX(-50%);" +
+      "z-index:2147483647;pointer-events:none;white-space:nowrap;" +
+      "background:rgba(20,26,40,.96);color:#fff;font-size:14px;" +
+      "font-family:system-ui,sans-serif;padding:10px 18px;" +
+      "border-radius:9999px;border:1px solid #3EB1F9;" +
+      "box-shadow:0 8px 28px rgba(0,0,0,.55);";
+    document.body.appendChild(pickPill);
+  }
+
+  function setHover(card) {
+    hoverCard = card;
+    if (!pickHL) return;
+    if (!card) {
+      pickHL.style.display = "none";
+      return;
+    }
+    var r = card.getBoundingClientRect();
+    pickHL.style.display = "block";
+    pickHL.style.left = r.left + "px";
+    pickHL.style.top = r.top + "px";
+    pickHL.style.width = r.width + "px";
+    pickHL.style.height = r.height + "px";
+  }
+
+  function applyPickOver() {
+    pickRaf = 0;
+    if (!picking || !lastOverEvent) return;
+    var t = lastOverEvent.target;
+    lastOverEvent = null;
+    setHover(cardFromElement(t));
+  }
+
+  function onPickOver(e) {
+    lastOverEvent = e;
+    if (!pickRaf) pickRaf = raf(applyPickOver);
+  }
+
+  function onPickScroll() {
+    if (picking && hoverCard) setHover(hoverCard);
+  }
+
+  function onPickClick(e) {
+    if (!picking || !hoverCard) return; // empty clicks pass through
+    // Capture phase: stop the click before the card's overlay link can
+    // navigate away.
+    e.preventDefault();
+    e.stopPropagation();
+    var card = hoverCard;
+    var postId = postIdFromCard(card);
+    stopPicker();
+    if (!postId) {
+      toast("Couldn't read that post.");
+      return;
+    }
+    renderCard(card, postId);
+  }
+
+  function onPickKey(e) {
+    if (e.key === "Escape" || e.key === "Esc") {
+      e.preventDefault();
+      stopPicker();
+    }
+  }
+
+  function renderCard(cardRoot, postId) {
+    toast("Rendering…");
     var payload = null;
     try {
       payload = extractPost(cardRoot, postId);
     } catch (e) {
       payload = null;
     }
-    function done(msg) {
-      btn.disabled = false;
-      btn.innerHTML = old;
-      if (msg) toast(msg);
-    }
     if (!payload || !payload.postId) {
-      done("Couldn't read that post.");
+      toast("Couldn't read that post.");
       return;
     }
     if (!api || !api.runtime || !api.runtime.sendMessage) {
-      done("Extension context lost — reload the page.");
+      toast("Extension context lost — reload the page.");
       return;
     }
     api.runtime
       .sendMessage({ type: RENDER_MSG, payload: payload })
       .then(function (res) {
-        done(res && res.ok ? "Image downloaded ✓" : "Couldn't generate the image.");
+        toast(
+          res && res.ok ? "Image downloaded ✓" : "Couldn't generate the image."
+        );
       })
       .catch(function () {
-        done("Couldn't generate the image.");
+        toast("Couldn't generate the image.");
       });
   }
 
-  function injectButton(cardRoot, postId) {
-    if (cardRoot.querySelector("[" + BTN_ATTR + "]")) return;
-    var btn = document.createElement("button");
-    btn.setAttribute(BTN_ATTR, postId);
-    btn.type = "button";
-    btn.title = "Turn this post into a PNG image";
-    // The site's light-blue icon, same as the website's branding.
-    var iconUrl =
-      api && api.runtime && api.runtime.getURL
-        ? api.runtime.getURL("icons/icon-32.png")
-        : "";
-    btn.innerHTML = iconUrl
-      ? '<img src="' +
-        iconUrl +
-        '" alt="" style="width:14px;height:14px;vertical-align:-2px;' +
-        'margin-right:4px;border-radius:3px;pointer-events:none;">Image'
-      : "Image";
-    btn.style.cssText =
-      "margin-left:8px;padding:3px 10px;border-radius:9999px;flex:none;" +
-      "border:1px solid #3A4358;background:#333D52;color:#fff;" +
-      "font-size:12px;line-height:1.6;cursor:pointer;font-family:inherit;" +
-      // The card's full-bleed /post/ overlay link sits at z-index 0 — stay
-      // positioned above it so the button actually receives clicks.
-      "position:relative;z-index:1;";
-    btn.addEventListener("mouseenter", function () {
-      btn.style.background = "#3EB1F9";
-      btn.style.borderColor = "#3EB1F9";
-    });
-    btn.addEventListener("mouseleave", function () {
-      btn.style.background = "#333D52";
-      btn.style.borderColor = "#3A4358";
-    });
-    btn.addEventListener("click", function (e) {
-      e.preventDefault();
-      e.stopPropagation();
-      onMakeImage(postId, cardRoot, btn);
-    });
-
-    // Park it at the end of the action row: locate the row via the last
-    // counted engagement button, then insert after the row's final button
-    // (covers trailing icon-only buttons like the feed's axe/share).
-    var target = null;
-    var btns = cardRoot.querySelectorAll("button");
-    var i, b;
-    for (i = btns.length - 1; i >= 0; i--) {
-      b = btns[i];
-      if (b.hasAttribute(BTN_ATTR)) continue;
-      if (isEngagementButton(b)) {
-        target = b.parentElement;
-        break;
-      }
-    }
-    if (target) {
-      var rowBtns = target.querySelectorAll("button");
-      var last = null;
-      for (i = rowBtns.length - 1; i >= 0; i--) {
-        if (!rowBtns[i].hasAttribute(BTN_ATTR)) {
-          last = rowBtns[i];
-          break;
-        }
-      }
-      target.insertBefore(btn, last ? last.nextSibling : null);
-    } else {
-      cardRoot.appendChild(btn);
-    }
+  function startPicker() {
+    if (picking) return;
+    ensurePickerDom();
+    if (pickPill && !pickPill.parentNode)
+      document.body.appendChild(pickPill);
+    picking = true;
+    hoverCard = null;
+    savedCursor = document.documentElement.style.cursor || "";
+    document.documentElement.style.cursor = "crosshair";
+    document.addEventListener("mouseover", onPickOver);
+    document.addEventListener("click", onPickClick, true);
+    document.addEventListener("keydown", onPickKey, true);
+    document.addEventListener("scroll", onPickScroll, true);
   }
 
-  // Group post links by card; the first link (document order) that maps to a
-  // new card defines that card's post id — the outer post's timestamp link
-  // always precedes any quoted-post links inside the card.
-  function scan() {
-    var anchors = document.querySelectorAll(
-      'a[href*="/post/"]:not([' + SEEN_ANCHOR + "])"
-    );
-    Array.prototype.forEach.call(anchors, function (a) {
-      a.setAttribute(SEEN_ANCHOR, "1");
-      var postId = postIdFromAnchor(a);
-      if (!postId) return;
-      var root = findCardRoot(a);
-      // Couldn't scope to a card — don't spray buttons on the page.
-      if (!root || root === document.documentElement) return;
-      if (root.hasAttribute && root.hasAttribute(SCANNED_ROOT)) return;
-      if (root.setAttribute) root.setAttribute(SCANNED_ROOT, "1");
-      try {
-        injectButton(root, postId);
-      } catch (e) {
-        /* never break the page */
-      }
-    });
+  function stopPicker() {
+    if (!picking) return;
+    picking = false;
+    hoverCard = null;
+    pickRaf = 0;
+    document.removeEventListener("mouseover", onPickOver);
+    document.removeEventListener("click", onPickClick, true);
+    document.removeEventListener("keydown", onPickKey, true);
+    document.removeEventListener("scroll", onPickScroll, true);
+    document.documentElement.style.cursor = savedCursor;
+    if (pickHL) pickHL.style.display = "none";
+    if (pickPill && pickPill.parentNode)
+      pickPill.parentNode.removeChild(pickPill);
   }
 
-  var scanTimer = null;
-  function scheduleScan() {
-    if (scanTimer) return;
-    scanTimer = setTimeout(function () {
-      scanTimer = null;
-      try {
-        scan();
-      } catch (e) {
-        /* never break the page */
-      }
-    }, 400);
-  }
-
-  if (document.body) {
-    try {
-      scan();
-    } catch (e) {
-      /* never break the page */
-    }
-    // MutationObserver covers infinite scroll + SPA navigation. Guarded for
-    // non-browser runtimes (e.g. the jsdom smoke test).
-    if (typeof MutationObserver !== "undefined") {
-      var mo = new MutationObserver(function (muts) {
-        for (var i = 0; i < muts.length; i++) {
-          if (muts[i].addedNodes && muts[i].addedNodes.length) {
-            scheduleScan();
-            break;
-          }
-        }
-      });
-      mo.observe(document.body, { childList: true, subtree: true });
-    }
-  } else {
-    document.addEventListener("DOMContentLoaded", function () {
-      try {
-        scan();
-      } catch (e) {
-        /* never break the page */
-      }
-    });
-  }
-
-  // -------------------------------------------------------------------------
-  // Toolbar-button support (existing behavior)
-  // -------------------------------------------------------------------------
+  // Exposed for the Node smoke test (harmless in production).
+  globalThis.__pickaxPicker = {
+    start: startPicker,
+    stop: stopPicker,
+    cardFromElement: cardFromElement,
+  };
 
   if (api && api.runtime && api.runtime.onMessage) {
     api.runtime.onMessage.addListener(function (msg) {
-      if (msg && msg.type === EXTRACT_MSG) {
+      if (msg && msg.type === PICK_MSG) {
         try {
-          return Promise.resolve(extractPost());
+          startPicker();
         } catch (e) {
-          return Promise.resolve(null);
+          /* never break the page */
         }
+        return Promise.resolve({ ok: true });
       }
       return undefined;
     });

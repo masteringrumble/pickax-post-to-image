@@ -13,16 +13,16 @@
 >
 > HOW IT WORKS
 > 1. Install the extension and browse pickax.com as usual.
-> 2. Every post gets a small "Image" button (with the Pickax Post to Image
->    icon) in its action row — in your feed and on post pages.
-> 3. Click it: the post is captured (author, avatar, full text, timestamp,
->    picks, axes, views, images — including quoted posts with both authors'
+> 2. Click the toolbar button: the page enters picker mode — hover any post
+>    and it lights up with a blue highlight; click it.
+> 3. The post is captured (author, avatar, full text, timestamp, picks,
+>    axes, views, images — including quoted posts with both authors'
 >    verification badges) and the PNG downloads automatically. No website
->    visit needed.
+>    visit needed. Press Esc to leave picker mode.
 > 4. Share the image anywhere.
 >
-> Prefer the web tool? The toolbar button still opens any post in the web
-> app with everything pre-filled.
+> Prefer the web tool? It's free and open source:
+> https://github.com/masteringrumble/pickax-post-to-image
 >
 > PRIVACY
 > No accounts, no analytics, no tracking. The extension reads the post only

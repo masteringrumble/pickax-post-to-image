@@ -2,15 +2,15 @@
  *
  * Two flows:
  *
- * 1. One-click images (new in v1.1): the content script's per-post "Image"
- *    buttons send an extracted post here. The worker renders it in a hidden
- *    offscreen document (real DOM + canvas + webfonts, same renderer as the
- *    web app) and downloads the PNG directly — no website visit needed.
- *    Where the offscreen API is unavailable, it falls back to opening the
- *    web app with the post pre-filled (the v1.0 behavior).
- * 2. Toolbar button: on a Pickax post page, extracts the post and opens the
- *    web app with the data in the #import= URL hash; anywhere else it just
- *    opens the web app.
+ * 1. Element picker (new in v1.2): clicking the toolbar button on any
+ *    Pickax page puts the tab in picker mode (uBlock Origin style) — the
+ *    user hovers a post card to highlight it and clicks it. The content
+ *    script extracts that post and sends it here; the worker renders it in
+ *    a hidden offscreen document (real DOM + canvas + webfonts, same
+ *    renderer as the web app) and downloads the PNG directly — no website
+ *    visit needed. Where the offscreen API is unavailable, it falls back
+ *    to opening the web app with the post pre-filled (the v1.0 behavior).
+ * 2. Toolbar button anywhere else: just opens the web app.
  *
  * No data is collected, stored, or transmitted by this extension itself.
  */
@@ -19,8 +19,8 @@
 
   var api = globalThis.browser || globalThis.chrome;
   var APP_URL = "https://pickax2image.top/";
-  var POST_RE = /^https:\/\/(www\.)?pickax\.com\/post\/\d+/;
-  var EXTRACT_MSG = "pickax-post-to-image:extract";
+  var PICKAX_RE = /^https:\/\/(www\.)?pickax\.com\//;
+  var PICK_MSG = "pickax-post-to-image:pick";
   var RENDER_MSG = "pickax-post-to-image:render";
   var OFFSCREEN_MSG = "pickax-post-to-image:render-offscreen";
 
@@ -32,21 +32,21 @@
     return api.tabs.create({ url: url });
   }
 
-  async function extractFromTab(tabId) {
+  // Tell the tab's content script to enter picker mode. The tab may have
+  // been open before the extension was installed (or navigation raced the
+  // content script): inject now, then ask again.
+  async function startPickerInTab(tabId) {
     try {
-      var payload = await api.tabs.sendMessage(tabId, { type: EXTRACT_MSG });
-      if (payload && payload.postId) return payload;
+      await api.tabs.sendMessage(tabId, { type: PICK_MSG });
+      return;
     } catch (e) {
       /* content script not listening — fall through to inject it */
     }
-    // The tab was open before the extension was installed (or navigation
-    // raced the content script): inject now, then ask again.
     await api.scripting.executeScript({
       target: { tabId: tabId },
       files: ["content.js"],
     });
-    var retry = await api.tabs.sendMessage(tabId, { type: EXTRACT_MSG });
-    return retry && retry.postId ? retry : null;
+    await api.tabs.sendMessage(tabId, { type: PICK_MSG });
   }
 
   // Render the extracted post in the offscreen document and download the
@@ -100,12 +100,9 @@
 
   api.action.onClicked.addListener(async function (tab) {
     try {
-      if (tab && tab.id != null && POST_RE.test(tab.url || "")) {
-        var payload = await extractFromTab(tab.id);
-        if (payload) {
-          await openApp(payload);
-          return;
-        }
+      if (tab && tab.id != null && PICKAX_RE.test(tab.url || "")) {
+        await startPickerInTab(tab.id);
+        return;
       }
     } catch (e) {
       /* fall through to a plain app open */

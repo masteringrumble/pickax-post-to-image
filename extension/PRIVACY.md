@@ -1,32 +1,39 @@
 # Privacy Policy — Pickax Post to Image (browser extension)
 
-**Last updated:** September 19, 2026
+**Last updated:** September 20, 2026
 
 ## What this extension does
 
-Pickax Post to Image adds a toolbar button. When you click it while viewing
-a public Pickax post (`pickax.com/post/…`), it reads that page and opens the
-[Pickax Post to Image web tool](https://www.pickax2image.top/)
-with the post's details (author, avatar, text, timestamp, counts, images)
-pre-filled, so you can generate a shareable image of the post.
+Pickax Post to Image adds a toolbar button. When you click it while on
+pickax.com, the page enters picker mode: hover any post and it highlights,
+click it, and the extension reads that post (author, avatar, text,
+timestamp, picks, axes, views, images) and renders a shareable PNG image of
+it, downloaded straight to your device. Press Esc to leave picker mode.
+Nothing is injected into posts — no buttons, no page changes.
 
 ## Data handling
 
 - **No accounts. No analytics. No tracking.**
-- The extension reads the Pickax post page **only on your device, only when
-  you click the toolbar button**. Nothing is read in the background.
-- The extracted post data is passed to the web tool through the page URL
-  (a `#import=` link you open yourself). It is never sent anywhere else.
+- The extension reads a Pickax post **only on your device, only when you
+  click a highlighted post in picker mode**. Nothing is read in the
+  background.
+- The extracted post data is rendered locally in your browser (offscreen
+  document) into a PNG saved to your downloads. It is never sent anywhere
+  else.
 - **Nothing is stored** by the extension — no local storage, no cookies, no
   servers, no third parties.
 
 ## Permissions used
 
-- **Read access to `pickax.com/post/*`** — required to extract the post you
-  asked to convert. Used only when you click the button on a post page.
-- **`scripting`** — fallback that re-injects the extractor if the tab was
-  open before the extension was installed.
+- **Read access to `pickax.com/*`** — required to highlight posts and
+  extract the one you click. Used only in picker mode, only after you click
+  the toolbar button.
+- **`scripting`** — fallback that loads the picker if the tab was open
+  before the extension was installed.
+- **`offscreen`** — renders the post image in a hidden document.
+- **`downloads`** — saves the generated PNG to your device.
 
 ## Contact
 
-Issues: https://github.com/masteringrumble/pickax-post-to-image/issues
+Questions: open an issue at
+https://github.com/masteringrumble/pickax-post-to-image
