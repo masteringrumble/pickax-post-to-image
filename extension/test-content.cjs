@@ -327,7 +327,7 @@ ${feedCard("222222", "bob", "Bob B", "u-bob/b.jpeg", "3 hours ago", "p-222/photo
   });
   delete globalThis.__pickaxPostToImageInjected; // allow re-eval in the test harness
   // Stub the extension API: icon URL for the hint pill + capture the
-  // render message the panel sends on Download.
+  // preview/render messages the panel sends.
   var sentMsgs = [];
   globalThis.chrome = {
     runtime: {
@@ -336,6 +336,12 @@ ${feedCard("222222", "bob", "Bob B", "u-bob/b.jpeg", "3 hours ago", "p-222/photo
       },
       sendMessage: function (msg) {
         sentMsgs.push(msg);
+        if (msg.type === "pickax-post-to-image:preview") {
+          return Promise.resolve({
+            ok: true,
+            dataUrl: "data:image/png;base64,PREVIEW",
+          });
+        }
         return Promise.resolve({ ok: true });
       },
     },
@@ -395,14 +401,28 @@ ${feedCard("222222", "bob", "Bob B", "u-bob/b.jpeg", "3 hours ago", "p-222/photo
   );
   assert.ok(pill, "hint pill shown");
 
-  // Hover card 1 -> click -> options panel pops up (nothing sent yet).
+  // Hover card 1 -> click -> options panel pops up with a live preview.
   const innerBtn = card1.querySelector(".actions button");
   innerBtn.dispatchEvent(
     new domF.window.MouseEvent("mouseover", { bubbles: true })
   );
   await new Promise((r) => setTimeout(r, 40)); // let the rAF hover update run
   innerBtn.dispatchEvent(new domF.window.MouseEvent("click", { bubbles: true }));
-  assert.equal(sentMsgs.length, 0, "nothing sent before Download");
+  await new Promise((r) => setTimeout(r, 30)); // let the preview promise settle
+  assert.equal(sentMsgs.length, 1, "live preview requested on panel open");
+  assert.equal(sentMsgs[0].type, "pickax-post-to-image:preview");
+  assert.deepEqual(
+    sentMsgs[0].options,
+    {
+      showLogo: true,
+      showViews: true,
+      showMedia: true,
+      showLinkCard: true,
+      showEngagement: true,
+    },
+    "preview starts with default options"
+  );
+  assert.equal(sentMsgs[0].payload.postId, "111111", "picked card 1");
   const panel = docF.getElementById("pickax-post-to-image-panel-backdrop");
   assert.ok(panel, "options panel shown");
   // Same toggle visibility as the website: card 1 has images, no link card.
@@ -423,22 +443,37 @@ ${feedCard("222222", "bob", "Bob B", "u-bob/b.jpeg", "3 hours ago", "p-222/photo
     "cursor restored after pick"
   );
 
-  // Flip "Post images" off, then Download -> render message carries options.
+  // Flip "Post images" off -> debounced live preview re-renders.
   const mediaRow = panel.querySelector('[data-ppi-toggle="showMedia"]');
   mediaRow.querySelector('button[role="switch"]').click();
+  await new Promise((r) => setTimeout(r, 450)); // debounce (220ms) + promise
+  assert.equal(sentMsgs.length, 2, "live preview re-rendered after toggle");
+  assert.equal(sentMsgs[1].type, "pickax-post-to-image:preview");
+  assert.equal(
+    sentMsgs[1].options.showMedia,
+    false,
+    "preview reflects the flipped toggle"
+  );
+  const previewImg = panel.querySelector("img[alt='Post image preview']");
+  assert.ok(
+    previewImg && previewImg.src.indexOf("data:image/png") === 0,
+    "preview image painted"
+  );
+
+  // Download -> render message carries options, panel closes.
   panel.querySelector("[data-ppi-download]").click();
   await new Promise((r) => setTimeout(r, 30)); // let the sendMessage promise settle
-  assert.equal(sentMsgs.length, 1, "one render message sent on Download");
-  assert.equal(sentMsgs[0].type, "pickax-post-to-image:render");
-  assert.equal(sentMsgs[0].payload.postId, "111111", "picked card 1");
-  assert.equal(sentMsgs[0].payload.username, "alice", "no cross-card bleed");
+  assert.equal(sentMsgs.length, 3, "render message sent on Download");
+  assert.equal(sentMsgs[2].type, "pickax-post-to-image:render");
+  assert.equal(sentMsgs[2].payload.postId, "111111", "picked card 1");
+  assert.equal(sentMsgs[2].payload.username, "alice", "no cross-card bleed");
   assert.equal(
-    sentMsgs[0].payload.text,
+    sentMsgs[2].payload.text,
     "Alice post text",
     "payload text extracted for the picked card"
   );
   assert.deepEqual(
-    sentMsgs[0].options,
+    sentMsgs[2].options,
     {
       showLogo: true,
       showViews: true,
@@ -446,7 +481,7 @@ ${feedCard("222222", "bob", "Bob B", "u-bob/b.jpeg", "3 hours ago", "p-222/photo
       showLinkCard: true,
       showEngagement: true,
     },
-    "options reflect the flipped toggle"
+    "download options reflect the flipped toggle"
   );
   assert.equal(
     docF.getElementById("pickax-post-to-image-panel-backdrop"),
@@ -455,11 +490,12 @@ ${feedCard("222222", "bob", "Bob B", "u-bob/b.jpeg", "3 hours ago", "p-222/photo
   );
 
   // Esc cancels picker mode without sending anything.
+  const sentBefore = sentMsgs.length;
   pickerF.start();
   docF.dispatchEvent(
     new domF.window.KeyboardEvent("keydown", { key: "Escape", bubbles: true })
   );
-  assert.equal(sentMsgs.length, 1, "nothing sent on Esc");
+  assert.equal(sentMsgs.length, sentBefore, "nothing sent on Esc");
   assert.equal(
     docF.documentElement.style.cursor,
     "",

@@ -20,13 +20,14 @@ extension/
 
 Picker flow: clicking the toolbar button on any pickax.com page puts the tab
 in picker mode — hover a post card to highlight it, click it, and an options
-panel pops up right on the page with the same "Show in image" toggles as the
-website (Logo, Views, Post images, Site embed, Picks & axes — shown only
-when the post has that content). Download renders the PNG via the offscreen
-document (same renderer as the web app, honoring the toggles) and saves it
-with chrome.downloads. Everything happens inside the extension; the site
-never opens. Esc cancels. No buttons are injected into posts. On non-Pickax
-pages the toolbar button just opens the web app.
+panel pops up right on the page with a live preview and the same "Show in
+image" toggles as the website (Logo, Views, Post images, Site embed,
+Picks & axes — shown only when the post has that content). The preview
+re-renders as toggles flip (remote images are cached, so flips are instant).
+Download renders the final PNG via the offscreen document and saves it with
+chrome.downloads. Everything happens inside the extension; the site never
+opens. Esc cancels. No buttons are injected into posts. On non-Pickax pages
+the toolbar button just opens the web app.
 
 ## Test
 

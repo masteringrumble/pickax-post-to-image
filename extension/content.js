@@ -4,9 +4,9 @@
  *
  * 1. Element picker (uBlock Origin style): clicking the toolbar button puts
  *    the page in picker mode — hovering a post card highlights it, clicking
- *    it pops up an options panel right on the page (same "Show in image"
- *    toggles as the website), then Download renders the PNG. No buttons
- *    are injected into posts. Esc cancels.
+ *    it pops up an options panel right on the page with a live preview and
+ *    the same "Show in image" toggles as the website, then Download renders
+ *    the PNG. No buttons are injected into posts. Esc cancels.
  * 2. Post extraction: the payload + DOM extraction the picker (and the
  *    toolbar fallback) uses to build the image.
  *
@@ -23,6 +23,7 @@
   globalThis.__pickaxPostToImageInjected = true;
 
   var RENDER_MSG = "pickax-post-to-image:render";
+  var PREVIEW_MSG = "pickax-post-to-image:preview";
 
   // An engagement button (pick / axe / comment): a real page button holding
   // an icon SVG plus a numeric count. Color-agnostic — Pickax restyles these
@@ -746,7 +747,7 @@
 
     var panel = document.createElement("div");
     panel.style.cssText =
-      "width:400px;max-width:92vw;max-height:88vh;overflow:auto;" +
+      "width:560px;max-width:94vw;max-height:90vh;overflow:auto;" +
       "background:#141a28;color:#eef2f9;border-radius:16px;" +
       "border:1px solid rgba(62,177,249,.45);" +
       "box-shadow:0 24px 70px rgba(0,0,0,.6);padding:20px;";
@@ -780,36 +781,54 @@
     head.appendChild(x);
     panel.appendChild(head);
 
-    // Post summary
-    var sum = document.createElement("div");
-    sum.style.cssText =
-      "display:flex;gap:10px;align-items:flex-start;background:#1b2334;" +
-      "border-radius:12px;padding:12px;margin-bottom:16px;";
-    if (payload.avatarUrl) {
-      var av = document.createElement("img");
-      av.src = payload.avatarUrl;
-      av.alt = "";
-      av.style.cssText =
-        "width:40px;height:40px;border-radius:50%;object-fit:cover;flex:none;";
-      sum.appendChild(av);
+    // Live preview: renders the real image and updates as toggles flip,
+    // exactly like the website.
+    var previewWrap = document.createElement("div");
+    previewWrap.style.cssText =
+      "background:#0e1420;border-radius:12px;margin-bottom:16px;" +
+      "min-height:220px;display:flex;align-items:center;justify-content:center;" +
+      "overflow:hidden;";
+    var previewImg = document.createElement("img");
+    previewImg.alt = "Post image preview";
+    previewImg.style.cssText =
+      "width:100%;height:auto;display:block;border-radius:12px;";
+    var previewNote = document.createElement("div");
+    previewNote.textContent = "Rendering preview…";
+    previewNote.style.cssText = "font-size:13px;color:#8b94a9;padding:40px 0;";
+    previewWrap.appendChild(previewNote);
+    panel.appendChild(previewWrap);
+
+    var previewSeq = 0;
+    var previewTimer = 0;
+    var previewShown = false;
+    function runPreview() {
+      previewTimer = 0;
+      if (!api || !api.runtime || !api.runtime.sendMessage) return;
+      var seq = ++previewSeq;
+      previewImg.style.opacity = ".45";
+      api.runtime
+        .sendMessage({ type: PREVIEW_MSG, payload: payload, options: opts })
+        .then(function (res) {
+          if (seq !== previewSeq) return; // a newer render won
+          if (res && res.ok && res.dataUrl) {
+            if (!previewShown) {
+              previewWrap.textContent = "";
+              previewWrap.appendChild(previewImg);
+              previewShown = true;
+            }
+            previewImg.src = res.dataUrl;
+          }
+          previewImg.style.opacity = "1";
+        })
+        .catch(function () {
+          previewImg.style.opacity = "1";
+        });
     }
-    var sumText = document.createElement("div");
-    sumText.style.cssText = "min-width:0;";
-    var who = document.createElement("div");
-    who.style.cssText = "font-weight:600;font-size:14px;";
-    who.textContent =
-      (payload.displayName || payload.username || "Post") +
-      (payload.username ? " @" + payload.username : "");
-    sumText.appendChild(who);
-    var snippet = document.createElement("div");
-    snippet.style.cssText =
-      "font-size:13px;color:#aab4c9;margin-top:2px;overflow:hidden;" +
-      "display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;";
-    var t = payload.text || "";
-    snippet.textContent = t.length > 160 ? t.slice(0, 160) + "…" : t;
-    sumText.appendChild(snippet);
-    sum.appendChild(sumText);
-    panel.appendChild(sum);
+    function schedulePreview(immediate) {
+      if (previewTimer) clearTimeout(previewTimer);
+      if (immediate) runPreview();
+      else previewTimer = setTimeout(runPreview, 220);
+    }
 
     // Toggles
     var legend = document.createElement("div");
@@ -832,6 +851,7 @@
       row.appendChild(
         makeSwitch(opts[tg.key], function (v) {
           opts[tg.key] = v;
+          schedulePreview(false);
         })
       );
       panel.appendChild(row);
@@ -883,6 +903,7 @@
     backdrop.appendChild(panel);
     document.body.appendChild(backdrop);
     document.addEventListener("keydown", onPanelKey, true);
+    schedulePreview(true); // first paint of the live preview
   }
 
   function openPanelForCard(cardRoot, postId) {

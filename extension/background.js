@@ -23,6 +23,7 @@
   var PICKAX_RE = /^https:\/\/(www\.)?pickax\.com\//;
   var PICK_MSG = "pickax-post-to-image:pick";
   var RENDER_MSG = "pickax-post-to-image:render";
+  var PREVIEW_MSG = "pickax-post-to-image:preview";
   var OFFSCREEN_MSG = "pickax-post-to-image:render-offscreen";
 
   function openApp(payload) {
@@ -51,9 +52,8 @@
   }
 
   // Render the extracted post in the offscreen document (with the user's
-  // "Show in image" options) and download the PNG. Falls back to opening
-  // the web app when the offscreen API is unavailable (older browsers).
-  async function renderToDownload(payload, options) {
+  // "Show in image" options). Returns the PNG data URL without downloading.
+  async function renderViaOffscreen(payload, options) {
     if (api.offscreen && api.offscreen.createDocument) {
       try {
         var exists = false;
@@ -76,25 +76,44 @@
           options: options,
         });
         if (res && res.ok && res.dataUrl) {
-          await api.downloads.download({
-            url: res.dataUrl,
-            filename: res.filename || "pickax-post.png",
-            saveAs: false,
-          });
-          return { ok: true };
+          return { ok: true, dataUrl: res.dataUrl, filename: res.filename };
         }
         return { ok: false, error: (res && res.error) || "render-failed" };
       } catch (e) {
         return { ok: false, error: "offscreen-failed" };
       }
     }
-    await openApp(payload);
-    return { ok: true, opened: true };
+    return { ok: false, error: "offscreen-unavailable" };
+  }
+
+  // Full download flow. Falls back to opening the web app when the
+  // offscreen API is unavailable (older browsers).
+  async function renderToDownload(payload, options) {
+    var rendered = await renderViaOffscreen(payload, options);
+    if (rendered.ok && rendered.dataUrl) {
+      await api.downloads.download({
+        url: rendered.dataUrl,
+        filename: rendered.filename || "pickax-post.png",
+        saveAs: false,
+      });
+      return { ok: true };
+    }
+    if (rendered.error === "offscreen-unavailable") {
+      await openApp(payload);
+      return { ok: true, opened: true };
+    }
+    return { ok: false, error: rendered.error };
   }
 
   api.runtime.onMessage.addListener(function (msg, sender, sendResponse) {
     if (msg && msg.type === RENDER_MSG) {
       renderToDownload(msg.payload, msg.options).then(sendResponse);
+      return true; // async response
+    }
+    if (msg && msg.type === PREVIEW_MSG) {
+      renderViaOffscreen(msg.payload, msg.options).then(function (r) {
+        sendResponse({ ok: r.ok, dataUrl: r.dataUrl });
+      });
       return true; // async response
     }
     return undefined;

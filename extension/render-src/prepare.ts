@@ -91,57 +91,54 @@ function badge(v: string): VerifiedBadge {
   return v === "gold" ? "gold" : v === "blue" ? "blue" : null;
 }
 
+// Cache loaded images across renders so toggle flips re-render instantly
+// without refetching (mirrors the web app, which reuses its loaded data).
+// Failures are cached as null so a dead URL isn't retried on every flip.
+const imageCache = new Map<string, Promise<HTMLImageElement | null>>();
+function loadCdnImageCached(url: string): Promise<HTMLImageElement | null> {
+  const key = url.trim();
+  let hit = imageCache.get(key);
+  if (!hit) {
+    hit = loadCdnImage(key).catch(() => null);
+    imageCache.set(key, hit);
+  }
+  return hit;
+}
+
 /** Turn an extraction payload into renderer data, loading remote images. */
 export async function prepareRenderData(
   p: ExtractedPayload
 ): Promise<PostData> {
   let avatar: HTMLImageElement | null = null;
   if (p.avatarUrl) {
-    try {
-      avatar = await loadCdnImage(p.avatarUrl);
-    } catch {
-      /* renderer falls back to the placeholder avatar */
-    }
+    avatar = await loadCdnImageCached(p.avatarUrl);
   }
 
   const images: LoadedImage[] = [];
   for (const u of (p.imageUrls ?? []).slice(0, MAX_POST_IMAGES)) {
-    try {
-      images.push(toLoaded(await loadCdnImage(u)));
-    } catch {
-      /* failed images are omitted, never invented */
-    }
+    const loaded = await loadCdnImageCached(u);
+    if (loaded) images.push(toLoaded(loaded));
   }
 
   let videoThumb: LoadedImage | null = null;
   if (p.videoThumb) {
-    try {
-      videoThumb = toLoaded(await loadCdnImage(p.videoThumb));
-    } catch {
-      /* fall back to the placeholder player */
-    }
+    const loaded = await loadCdnImageCached(p.videoThumb);
+    if (loaded) videoThumb = toLoaded(loaded);
   }
 
   // The shared-website link card: load its preview image like any other
   // post image. When it fails, the card still renders domain + title.
   let linkImage: LoadedImage | null = null;
   if (p.linkCard?.imageUrl) {
-    try {
-      linkImage = toLoaded(await loadCdnImage(p.linkCard.imageUrl));
-    } catch {
-      /* link card renders without its preview image */
-    }
+    const loaded = await loadCdnImageCached(p.linkCard.imageUrl);
+    if (loaded) linkImage = toLoaded(loaded);
   }
 
   // The quoted post (quote posts only): the quoted author's own avatar,
   // badge, and full text — exactly as the inner card on pickax.com shows.
   let quotedAvatar: HTMLImageElement | null = null;
   if (p.q?.avatarUrl) {
-    try {
-      quotedAvatar = await loadCdnImage(p.q.avatarUrl);
-    } catch {
-      /* quoted card falls back to the placeholder avatar */
-    }
+    quotedAvatar = await loadCdnImageCached(p.q.avatarUrl);
   }
 
   const data: PostData = {
