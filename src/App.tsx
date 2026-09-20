@@ -514,8 +514,19 @@ export default function App() {
     <div className="page">
       <main className="card-wrap">
         <header className="hero">
-          <h1>Pickax Post to Image</h1>
-          <p className="tagline">Paste a post link, get the image.</p>
+          <span className="brand-mark" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="3" y="3" width="18" height="18" rx="3" />
+              <circle cx="9" cy="9" r="1.6" fill="#fff" stroke="none" />
+              <path d="M4.5 17.5 10 12l3.5 3.5 3-3 3 3" />
+            </svg>
+          </span>
+          <h1>
+            Pickax <span className="accent">Post to Image</span>
+          </h1>
+          <p className="tagline">
+            Turn any Pickax post into a clean, shareable image.
+          </p>
         </header>
 
         {stage === "url" && (
@@ -850,7 +861,11 @@ export default function App() {
         )}
       </main>
       <footer className="footer">
-        <span>Personal-use utility. Not affiliated with Pickax.</span>
+        <span>Free tool for the Pickax community</span>
+        <span className="dot">•</span>
+        <span>Images are built in your browser — nothing is uploaded or stored</span>
+        <span className="dot">•</span>
+        <span>Not affiliated with Pickax</span>
       </footer>
     </div>
   );
