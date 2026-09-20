@@ -6,9 +6,8 @@
  *    the page in picker mode — hovering a post card highlights it, clicking
  *    it pops up an options panel right on the page with a live preview and
  *    the same "Show in image" toggles as the website, then Download renders
- *    the PNG. A floating Buy Me a Coffee button (matching the site's blue
- *    widget) sits at the bottom-right while the panel is open. No buttons
- *    are injected into posts. Esc cancels.
+ *    the PNG. A blue Buy Me a Coffee button sits centered below the panel
+ *    buttons. No buttons are injected into posts. Esc cancels.
  * 2. Post extraction: the payload + DOM extraction the picker (and the
  *    toolbar fallback) uses to build the image.
  *
@@ -695,13 +694,9 @@
     return sw;
   }
 
-  // Floating Buy Me a Coffee button (removed with the panel).
-  var bmcBtn = null;
   function closePanel() {
     var b = document.getElementById(PANEL_BACKDROP_ID);
     if (b && b.parentNode) b.parentNode.removeChild(b);
-    if (bmcBtn && bmcBtn.parentNode) bmcBtn.parentNode.removeChild(bmcBtn);
-    bmcBtn = null;
     document.removeEventListener("keydown", onPanelKey, true);
   }
 
@@ -906,37 +901,23 @@
     foot.appendChild(dl);
     panel.appendChild(foot);
 
+    // Buy Me a Coffee: the official button, blue to match the site.
+    var bmc = document.createElement("a");
+    bmc.href = "https://www.buymeacoffee.com/masteringrumble";
+    bmc.target = "_blank";
+    bmc.rel = "noopener";
+    bmc.style.cssText = "display:block;margin:16px auto 0;width:217px;";
+    var bmcImg = document.createElement("img");
+    bmcImg.src = "https://cdn.buymeacoffee.com/buttons/v2/default-blue.png";
+    bmcImg.alt = "Buy Me a Coffee";
+    bmcImg.style.cssText =
+      "height:60px !important;width:217px !important;display:block;";
+    bmc.appendChild(bmcImg);
+    panel.appendChild(bmc);
+
     backdrop.appendChild(panel);
     document.body.appendChild(backdrop);
     document.addEventListener("keydown", onPanelKey, true);
-
-    // Buy Me a Coffee: floating circle matching the site's widget
-    // (#3eb1f9, white cup), bottom-right like the website.
-    bmcBtn = document.createElement("a");
-    bmcBtn.href = "https://www.buymeacoffee.com/masteringrumble";
-    bmcBtn.target = "_blank";
-    bmcBtn.rel = "noopener";
-    bmcBtn.title = "Buy me a coffee";
-    bmcBtn.setAttribute("aria-label", "Buy me a coffee");
-    bmcBtn.style.cssText =
-      "position:fixed;right:22px;bottom:22px;width:52px;height:52px;" +
-      "border-radius:50%;background:#3eb1f9;display:flex;" +
-      "align-items:center;justify-content:center;" +
-      "box-shadow:0 8px 24px rgba(0,0,0,.45);z-index:2147483647;" +
-      "cursor:pointer;transition:transform .15s ease;";
-    bmcBtn.innerHTML =
-      '<svg width="26" height="26" viewBox="0 0 24 24" fill="none" aria-hidden="true">' +
-      '<path d="M5 9h11v5.2A4.2 4.2 0 0 1 11.8 18.4H9.2A4.2 4.2 0 0 1 5 14.2V9z" fill="#fff"/>' +
-      '<path d="M16 10h1.6a2.6 2.6 0 0 1 0 5.2H16" stroke="#fff" stroke-width="2" stroke-linecap="round"/>' +
-      '<path d="M4 20.5h14" stroke="#fff" stroke-width="2" stroke-linecap="round"/>' +
-      "</svg>";
-    bmcBtn.addEventListener("mouseenter", function () {
-      bmcBtn.style.transform = "scale(1.08)";
-    });
-    bmcBtn.addEventListener("mouseleave", function () {
-      bmcBtn.style.transform = "scale(1)";
-    });
-    document.body.appendChild(bmcBtn);
 
     schedulePreview(true); // first paint of the live preview
   }

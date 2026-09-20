@@ -426,19 +426,20 @@ ${feedCard("222222", "bob", "Bob B", "u-bob/b.jpeg", "3 hours ago", "p-222/photo
   const panel = docF.getElementById("pickax-post-to-image-panel-backdrop");
   assert.ok(panel, "options panel shown");
 
-  // Buy Me a Coffee: floating blue button (matches the site's widget).
-  const bmc = docF.querySelector('a[title="Buy me a coffee"]');
-  assert.ok(bmc, "BMC floating button shown with the panel");
-  assert.equal(
-    bmc.getAttribute("href"),
-    "https://www.buymeacoffee.com/masteringrumble",
-    "BMC link"
+  // Buy Me a Coffee: the official button, blue to match the site.
+  const bmc = panel.querySelector(
+    'a[href="https://www.buymeacoffee.com/masteringrumble"]'
   );
+  assert.ok(bmc, "BMC button shown in the panel");
   assert.equal(bmc.getAttribute("target"), "_blank", "BMC opens in a new tab");
-  assert.ok(
-    bmc.style.background.indexOf("62, 177, 249") !== -1, // #3eb1f9
-    "BMC matches the site's blue"
+  const bmcImg = bmc.querySelector("img");
+  assert.ok(bmcImg, "BMC button image");
+  assert.equal(
+    bmcImg.getAttribute("src"),
+    "https://cdn.buymeacoffee.com/buttons/v2/default-blue.png",
+    "BMC blue button asset"
   );
+  assert.equal(bmcImg.getAttribute("alt"), "Buy Me a Coffee", "BMC alt text");
   // Same toggle visibility as the website: card 1 has images, no link card.
   const toggleKeys = Array.prototype.map.call(
     panel.querySelectorAll("[data-ppi-toggle]"),
@@ -503,7 +504,7 @@ ${feedCard("222222", "bob", "Bob B", "u-bob/b.jpeg", "3 hours ago", "p-222/photo
     "panel closed after Download"
   );
   assert.equal(
-    docF.querySelector('a[title="Buy me a coffee"]'),
+    docF.querySelector('a[href="https://www.buymeacoffee.com/masteringrumble"]'),
     null,
     "BMC button removed with the panel"
   );
