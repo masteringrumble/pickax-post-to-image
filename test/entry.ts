@@ -717,7 +717,7 @@ async function main() {
       const bpayload = JSON.parse(
         decodeURIComponent(navigated.split("#import=")[1])
       );
-      assert.equal(bpayload.v, 7, "bookmarklet v7");
+      assert.equal(bpayload.v, 8, "bookmarklet v8");
       assert.deepEqual(
         bpayload.images,
         ["https://img.pickax.com/user-35295/graphic.jpeg"],
@@ -734,7 +734,7 @@ async function main() {
       delete (globalThis as any).window;
       assert.ok(back2?.linkCard, "link card survives the hash round-trip");
       assert.equal(back2!.linkCard!.domain, "trendingpoliticsnews.com");
-      console.log("ok  bookmarklet v7: link card end-to-end");
+      console.log("ok  bookmarklet v8: link card end-to-end");
 
       // Renderer: the link card draws its image box, domain, and title
       // below the post images.
@@ -1001,7 +1001,7 @@ async function main() {
       const lpayload = JSON.parse(
         decodeURIComponent(lnavigated.split("#import=")[1])
       );
-      assert.equal(lpayload.v, 7, "bookmarklet v7");
+      assert.equal(lpayload.v, 8, "bookmarklet v8");
       assert.ok(
         lpayload.avatar.includes("img.pickax.com/user-8356"),
         `author avatar, not viewer's (got ${lpayload.avatar})`
@@ -1197,6 +1197,170 @@ async function main() {
     const ctx = (canvas as any).__ctx || null;
     console.log(
       `ok  quote post renders with inner card (canvas ${canvas.width}x${canvas.height})`
+    );
+  }
+
+  // ---- quote-of-a-quote-of-a-quote: payload parser ------------------------
+  // Mirrors the real post 710375: Kelli Kay quotes Stone Bryson (gold), who
+  // quotes Jeff Dornik (gold). The devalue chain is 2 levels of repostOf.
+  {
+    const {
+      extractNuxtBlock,
+      parseNuxtPostData,
+    } = await import("../src/lib/nuxtPost");
+
+    const ago = new Date(Date.now() - 2.5 * 3600 * 1000).toISOString();
+    const fixture = JSON.stringify([
+      { post: 1 }, // 0: root
+      {
+        // 1: outer post (Kelli Kay)
+        id: 710375,
+        content: 2,
+        createdAt: ago,
+        user: 3,
+        repostOf: 5,
+      },
+      "This is exactly it.", // 2: outer text
+      {
+        // 3: outer author (no badge)
+        fullname: "Kelli Kay",
+        username: "kellikay",
+        avatar: "user-1/pic.jpeg",
+        is_verified: false,
+        creator: null,
+      },
+      99, // 4
+      {
+        // 5: middle quoted post (Stone Bryson, gold)
+        id: 710202,
+        content: 6,
+        createdAt: ago,
+        user: 7,
+        repostOf: 10,
+      },
+      "Mouthful of truth... 👇🏻", // 6: middle text
+      {
+        // 7: middle author (creator -> gold)
+        fullname: "Stone Bryson",
+        username: "stonebryson",
+        avatar: "user-2/pic.jpeg",
+        is_verified: true,
+        creator: 8,
+      },
+      { id: 9 }, // 8: creator record
+      99, // 9
+      {
+        // 10: innermost quoted post (Jeff Dornik, gold)
+        id: 709963,
+        content: 11,
+        createdAt: ago,
+        user: 12,
+      },
+      "Post and ghost is not a strategy on a NONALGORITHMIC platform like Pickax...", // 11: inner text
+      {
+        // 12: inner author (creator -> gold)
+        fullname: "Jeff Dornik",
+        username: "jeffdornik",
+        avatar: "user-3/pic.jpeg",
+        is_verified: true,
+        creator: 13,
+      },
+      { id: 14 }, // 13: creator record
+      99, // 14
+    ]);
+    const html =
+      `<html><head><script id="__NUXT_DATA__" type="application/json">` +
+      fixture +
+      `</script></head><body></body></html>`;
+    const block = extractNuxtBlock(html);
+    assert.ok(block, "nuxt block extracted");
+    const parsed = parseNuxtPostData(block!, "710375");
+    assert.ok(parsed, "post found by id");
+    assert.equal(parsed!.text, "This is exactly it.");
+    assert.equal(parsed!.author.verified, null);
+
+    // Level 1: Stone Bryson quoting Jeff.
+    const q1 = parsed!.quoted;
+    assert.ok(q1, "first-level quoted post extracted");
+    assert.equal(q1!.postId, "710202");
+    assert.equal(q1!.displayName, "Stone Bryson");
+    assert.equal(q1!.username, "stonebryson");
+    assert.equal(q1!.verified, "gold");
+    assert.equal(q1!.text, "Mouthful of truth... 👇🏻");
+
+    // Level 2: Jeff Dornik's post at the bottom of the chain.
+    const q2 = q1!.quoted;
+    assert.ok(q2, "second-level quoted post extracted");
+    assert.equal(q2!.postId, "709963");
+    assert.equal(q2!.displayName, "Jeff Dornik");
+    assert.equal(q2!.username, "jeffdornik");
+    assert.equal(q2!.verified, "gold");
+    assert.equal(
+      q2!.text,
+      "Post and ghost is not a strategy on a NONALGORITHMIC platform like Pickax..."
+    );
+    assert.equal(q2!.quoted, null, "chain ends at the innermost post");
+    console.log("ok  nested quote chain parses (2 levels of repostOf)");
+  }
+
+  // ---- quote-of-a-quote-of-a-quote: renderer draws both nested cards ------
+  {
+    const quotedAvatar = { width: 100, height: 100 } as any;
+    const canvas = await renderPostImage(
+      {
+        postId: "710375",
+        displayName: "Kelli Kay",
+        username: "kellikay",
+        verified: null,
+        avatar: null,
+        text: "This is exactly it.",
+        timestamp: "5 minutes ago",
+        images: [],
+        engagement: { picks: "0", axes: "5", views: "100" },
+        video: null,
+        quoted: {
+          postId: "710202",
+          displayName: "Stone Bryson",
+          username: "stonebryson",
+          verified: "gold",
+          avatar: quotedAvatar,
+          text: "Mouthful of truth...",
+          timestamp: "2 hours ago",
+          quoted: {
+            postId: "709963",
+            displayName: "Jeff Dornik",
+            username: "jeffdornik",
+            verified: "gold",
+            avatar: quotedAvatar,
+            text: "Post and ghost is not a strategy on a NONALGORITHMIC platform like Pickax...",
+            timestamp: "1 day ago",
+            quoted: null,
+          },
+        },
+      },
+      { showEngagement: true, showViews: true, showMedia: true, showLinkCard: true, showLogo: false }
+    );
+    assert.ok(canvas.width > 0 && canvas.height > 0, "nested card renders");
+    const ctx = (canvas as any)._ctx;
+    const drawn = ctx.calls
+      .filter((c: any[]) => c[0] === "fillText")
+      .map((c: any[]) => String(c[1]));
+    // Every level of the chain must be drawn: innermost text (drawn
+    // word-by-word) and both quoted authors' display names.
+    assert.ok(
+      drawn.some((t: string) => t.includes("NONALGORITHMIC")),
+      "innermost quote text drawn"
+    );
+    assert.ok(
+      drawn.some((t: string) => t.includes("Stone Bryson")),
+      "middle quoted author drawn"
+    );
+    assert.ok(
+      drawn.some((t: string) => t.includes("Jeff Dornik")),
+      "innermost quoted author drawn"
+    );
+    console.log(
+      `ok  nested quote chain renders (canvas ${canvas.width}x${canvas.height})`
     );
   }
 

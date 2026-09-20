@@ -9,6 +9,7 @@ import {
   extractNuxtBlock,
   parseNuxtPostData,
   type NuxtPostData,
+  type NuxtQuotedPost,
 } from "../../src/lib/nuxtPost";
 
 const POST_URL_RE = /^https?:\/\/(?:www\.)?pickax\.com\/post\/(\d+)(?:[/?#].*)?$/i;
@@ -96,6 +97,8 @@ export interface WorkerQuotedPost {
   text: string | null;
   /** Relative timestamp as the site shows it, e.g. "2 hours ago". */
   timestamp: string | null;
+  /** The post this quoted post itself quotes (quote-of-a-quote chains). */
+  quoted: WorkerQuotedPost | null;
 }
 
 export interface WorkerLinkCard {
@@ -341,17 +344,21 @@ export function extract(html: string, postId: string, postUrl: string): PostPayl
   const video = extractVideo(html);
 
   // The quoted post (repostOf) from the payload: the quoted author's own
-  // header info, avatar, badge, full text, and timestamp.
+  // header info, avatar, badge, full text, and timestamp. The payload nests
+  // these when the quoted post is itself a quote (quote-of-a-quote), so the
+  // chain is mapped recursively to match pickax.com's nested cards.
+  const mapQuoted = (nq: NuxtQuotedPost): WorkerQuotedPost => ({
+    postId: nq.postId,
+    displayName: nq.displayName || null,
+    username: nq.username || null,
+    avatarUrl: nq.avatarUrl || null,
+    verified: nq.verified,
+    text: nq.text || null,
+    timestamp: nq.timeAgo || null,
+    quoted: nq.quoted ? mapQuoted(nq.quoted) : null,
+  });
   const quoted: WorkerQuotedPost | null = nuxt?.quoted
-    ? {
-        postId: nuxt.quoted.postId,
-        displayName: nuxt.quoted.displayName || null,
-        username: nuxt.quoted.username || null,
-        avatarUrl: nuxt.quoted.avatarUrl || null,
-        verified: nuxt.quoted.verified,
-        text: nuxt.quoted.text || null,
-        timestamp: nuxt.quoted.timeAgo || null,
-      }
+    ? mapQuoted(nuxt.quoted)
     : null;
 
   if (!displayName && !username && !text) return null; // not a recognizable post page

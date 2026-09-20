@@ -24,6 +24,8 @@ export interface WorkerQuotedPost {
   text: string | null;
   /** Relative timestamp as the site shows it, e.g. "2 hours ago". */
   timestamp: string | null;
+  /** The next level of the quote chain, or null when none. */
+  quoted: WorkerQuotedPost | null;
 }
 
 export interface WorkerPostPayload {

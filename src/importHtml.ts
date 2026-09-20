@@ -9,6 +9,7 @@ import {
   extractNuxtBlock,
   parseNuxtPostData,
   type NuxtPostData,
+  type NuxtQuotedPost,
 } from "./lib/nuxtPost";
 
 export interface ParsedQuotedPost {
@@ -21,6 +22,8 @@ export interface ParsedQuotedPost {
   text: string;
   /** Relative timestamp as the site shows it, e.g. "2 hours ago". */
   timestamp: string;
+  /** The next level of the quote chain, or null when none. */
+  quoted: ParsedQuotedPost | null;
 }
 
 export interface ParsedLinkCard {
@@ -362,17 +365,24 @@ export function parsePostHtml(html: string): ParsedImport {
 
   const video = extractVideo(doc, html);
 
-  const quoted: ParsedQuotedPost | null = nuxt?.quoted
-    ? {
-        postId: nuxt.quoted.postId,
-        displayName: nuxt.quoted.displayName,
-        username: nuxt.quoted.username,
-        verified: nuxt.quoted.verified,
-        avatarUrl: nuxt.quoted.avatarUrl,
-        text: nuxt.quoted.text,
-        timestamp: nuxt.quoted.timeAgo,
-      }
-    : null;
+  // The quoted post (repostOf) from the payload: the quoted author's own
+  // avatar, badge, text, and timestamp — plus the whole nested quote chain
+  // when the quoted post is itself a quote, exactly as pickax.com nests
+  // the cards.
+  const mapNuxtQuoted = (nq: NuxtQuotedPost | null): ParsedQuotedPost | null =>
+    nq
+      ? {
+          postId: nq.postId,
+          displayName: nq.displayName,
+          username: nq.username,
+          verified: nq.verified,
+          avatarUrl: nq.avatarUrl,
+          text: nq.text,
+          timestamp: nq.timeAgo,
+          quoted: mapNuxtQuoted(nq.quoted),
+        }
+      : null;
+  const quoted: ParsedQuotedPost | null = mapNuxtQuoted(nuxt?.quoted ?? null);
 
   return {
     postId,
@@ -450,23 +460,33 @@ function coerceImport(raw: unknown): ParsedImport | null {
     .filter((u): u is string => typeof u === "string")
     .slice(0, 4);
   // v5 bookmarklets send the quoted post as `q`; older ones send nothing.
+  // v8+ sends nested quotes as `q.q` (quote-of-a-quote chains).
   const q = o.q && typeof o.q === "object" ? (o.q as Record<string, unknown>) : null;
-  const quoted: ParsedQuotedPost | null = q
-    ? {
-        postId: str(q.postId),
-        displayName: str(q.displayName),
-        username: str(q.username).replace(/^@+/, ""),
-        verified:
-          q.verified === "blue"
-            ? "blue"
-            : q.verified === "gold"
-              ? "gold"
-              : null,
-        avatarUrl: str(q.avatarUrl),
-        text: str(q.text),
-        timestamp: str(q.timestamp),
-      }
-    : null;
+  const mapHashQuoted = (
+    qq: Record<string, unknown> | null
+  ): ParsedQuotedPost | null =>
+    qq
+      ? {
+          postId: str(qq.postId),
+          displayName: str(qq.displayName),
+          username: str(qq.username).replace(/^@+/, ""),
+          verified:
+            qq.verified === "blue"
+              ? "blue"
+              : qq.verified === "gold"
+                ? "gold"
+                : null,
+          avatarUrl: str(qq.avatarUrl),
+          text: str(qq.text),
+          timestamp: str(qq.timestamp),
+          quoted: mapHashQuoted(
+            qq.q && typeof qq.q === "object"
+              ? (qq.q as Record<string, unknown>)
+              : null
+          ),
+        }
+      : null;
+  const quoted: ParsedQuotedPost | null = mapHashQuoted(q);
   // The shared-website link card (v7+ bookmarklets / extension).
   const lc = o.linkCard && typeof o.linkCard === "object"
     ? (o.linkCard as Record<string, unknown>)
@@ -549,7 +569,7 @@ export const BOOKMARKLET: string =
   "var d=document," +
   "q=function(s){return d.querySelector(s)}," +
   "meta=function(p){var e=q('meta[property=\"'+p+'\"]');return e?e.getAttribute('content')||'':''}," +
-  "o={v:7,postId:'',displayName:(meta('og:title')||'').replace(/\\s+posted\\s*$/i,'')," +
+  "o={v:8,postId:'',displayName:(meta('og:title')||'').replace(/\\s+posted\\s*$/i,'')," +
   "text:(meta('og:description')||'').replace(/\\s*user=\\S+\\s+[\\d,]+\\s+Followers\\s*$/i,'')," +
   "username:'',verified:'',avatar:'',timestamp:'',picks:'',axes:'',views:'',videoSrc:'',videoTitle:'',videoThumb:'',images:[],linkCard:null,q:null};" +
   "Array.prototype.forEach.call(d.querySelectorAll('a[href^=\"/\"]'),function(a){" +
@@ -617,6 +637,17 @@ export const BOOKMARKLET: string =
   "var h=Math.floor(m/60);if(h<24)return h+(h===1?' hour ago':' hours ago');" +
   "var dd=Math.floor(h/24);if(dd<7)return dd+(dd===1?' day ago':' days ago');" +
   "return new Date(t).toLocaleDateString(undefined,{month:'short',day:'numeric',year:'numeric'});};" +
+  // The quoted post chain (repostOf) is nested on pickax.com: a quote can
+  // quote a quote, so the chain is walked recursively into q.q (depth capped
+  // so a circular payload can't loop the bookmarklet).
+  "function mkQ(rp,dep){if(!rp||typeof rp.content!=='string')return null;" +
+  "var qu=rp.user||{},q={postId:String(rp.id||''),displayName:qu.fullname||''," +
+  "username:String(qu.username||'').replace(/^@+/,'')" +
+  ",avatarUrl:qu.avatar?('https://img.pickax.com/'+qu.avatar):''," +
+  "verified:qu.creator?'gold':(qu.is_verified?'blue':'')," +
+  "text:dvC(rp.content),timestamp:dvT(rp.createdAt||''),q:null};" +
+  "if(dep<8&&rp.repostOf)q.q=mkQ(rp.repostOf,dep+1);" +
+  "return q;};" +
   "var nd=d.getElementById('__NUXT_DATA__');" +
   "if(nd&&o.postId){try{var A=JSON.parse(nd.textContent||'');" +
   "if(A&&A.length){var RT=dvD(A,0,{},{}),seen=[],tgt=null;" +
@@ -643,12 +674,7 @@ export const BOOKMARKLET: string =
   "try{lch=new URL(lcu).hostname.replace(/^www\\./i,'');}catch(e){}" +
   "o.linkCard={url:lcu,title:lk2.title||'',domain:lch,imageUrl:lk2.image||'',description:lk2.description||''};}" +
   "var rp=tgt.repostOf;" +
-  "if(rp&&typeof rp.content==='string'){var qu=rp.user||{};" +
-  "o.q={postId:String(rp.id||''),displayName:qu.fullname||''," +
-  "username:String(qu.username||'').replace(/^@+/,'')" +
-  ",avatarUrl:qu.avatar?('https://img.pickax.com/'+qu.avatar):''," +
-  "verified:qu.creator?'gold':(qu.is_verified?'blue':'')," +
-  "text:dvC(rp.content),timestamp:dvT(rp.createdAt||'')};}}}" +
+  "if(rp&&typeof rp.content==='string')o.q=mkQ(rp,0);}}" +
   "}catch(e){}}" +
   // Link card DOM fallback (only when the payload didn't provide one):
   // div[title] wrapping an http anchor around a metadata/ preview image.

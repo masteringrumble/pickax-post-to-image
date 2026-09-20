@@ -21,6 +21,8 @@ import {
   DEFAULT_RENDER_OPTIONS,
   type LoadedImage,
   type PostData,
+  type QuotedPost,
+  type QuotedPostInput,
   type RenderOptions,
   type VerifiedBadge,
 } from "./types";
@@ -77,6 +79,35 @@ async function loadCdnImage(url: string): Promise<HTMLImageElement> {
   }
 }
 
+/**
+ * Build the renderer's quoted-post chain from any import path's quoted
+ * data, loading each level's avatar. Quote-of-a-quote chains nest, so
+ * this walks the whole `quoted` chain — like pickax.com's nested cards.
+ */
+async function loadQuotedPost(
+  q: QuotedPostInput | null | undefined
+): Promise<QuotedPost | null> {
+  if (!q) return null;
+  let avatar: HTMLImageElement | null = null;
+  if (q.avatarUrl) {
+    try {
+      avatar = await loadCdnImage(q.avatarUrl);
+    } catch {
+      /* quoted card falls back to the placeholder avatar */
+    }
+  }
+  return {
+    postId: q.postId,
+    displayName: q.displayName ?? "",
+    username: (q.username ?? "").replace(/^@+/, ""),
+    verified: q.verified ?? null,
+    avatar,
+    text: (q.text ?? "").replace(/\r\n/g, "\n"),
+    timestamp: q.timestamp ?? "",
+    quoted: await loadQuotedPost(q.quoted),
+  };
+}
+
 /** Turn a worker payload into renderer data, loading remote images. */
 async function postDataFromWorker(
   p: WorkerPostPayload
@@ -127,16 +158,9 @@ async function postDataFromWorker(
     }
   }
 
-  // The quoted post (quote posts only): the quoted author's own avatar,
-  // badge, and full text — exactly as the inner card on pickax.com shows.
-  let quotedAvatar: HTMLImageElement | null = null;
-  if (p.quoted?.avatarUrl) {
-    try {
-      quotedAvatar = await loadCdnImage(p.quoted.avatarUrl);
-    } catch {
-      /* quoted card falls back to the placeholder avatar */
-    }
-  }
+  // The quoted post (quote posts only): each level's avatar loads
+  // recursively via loadQuotedPost below.
+  const quoted = await loadQuotedPost(p.quoted);
 
   const data: PostData = {
     postId: p.postId,
@@ -164,17 +188,7 @@ async function postDataFromWorker(
           image: linkImage,
         }
       : null,
-    quoted: p.quoted
-      ? {
-          postId: p.quoted.postId,
-          displayName: p.quoted.displayName ?? "",
-          username: (p.quoted.username ?? "").replace(/^@+/, ""),
-          verified: p.quoted.verified ?? null,
-          avatar: quotedAvatar,
-          text: (p.quoted.text ?? "").replace(/\r\n/g, "\n"),
-          timestamp: p.quoted.timestamp ?? "",
-        }
-      : null,
+    quoted,
   };
   return { data, notice };
 }
@@ -340,14 +354,8 @@ export default function App() {
 
     // The quoted post (quote posts only): the quoted author's own avatar,
     // badge, and full text — exactly as the inner card on pickax.com shows.
-    let quotedAvatar: HTMLImageElement | null = null;
-    if (p.quoted?.avatarUrl) {
-      try {
-        quotedAvatar = await loadCdnImage(p.quoted.avatarUrl);
-      } catch {
-        /* quoted card falls back to the placeholder avatar */
-      }
-    }
+    // Nested quote chains load each level's avatar recursively.
+    const quoted = await loadQuotedPost(p.quoted);
 
     const data: PostData = {
       postId: p.postId,
@@ -376,17 +384,7 @@ export default function App() {
             image: linkImage,
           }
         : null,
-      quoted: p.quoted
-        ? {
-            postId: p.quoted.postId,
-            displayName: p.quoted.displayName,
-            username: p.quoted.username,
-            verified: p.quoted.verified,
-            avatar: quotedAvatar,
-            text: p.quoted.text.replace(/\r\n/g, "\n"),
-            timestamp: p.quoted.timestamp,
-          }
-        : null,
+      quoted,
     };
     try {
       await renderAndPreview(data);

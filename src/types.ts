@@ -55,6 +55,8 @@ export interface PostLinkCard {
 // A quoted (reposted) post embedded inside a quote post, as pickax.com
 // shows it: the quoted author's own header (avatar, name, badge,
 // timestamp) and their full text, inside the darker inner card.
+// `quoted` is the next level down: pickax.com nests quote cards, so a
+// quote-of-a-quote keeps the whole chain.
 export interface QuotedPost {
   postId: string;
   displayName: string;
@@ -65,6 +67,25 @@ export interface QuotedPost {
   avatar: HTMLImageElement | null;
   text: string;
   timestamp: string;
+  /** The post this quoted post itself quotes, or null when none. */
+  quoted: QuotedPost | null;
+}
+
+// The quoted-post shape every import path produces before its avatars are
+// loaded: worker payload, bookmarklet/hash import, paste-source import.
+export interface QuotedPostInput {
+  postId: string;
+  displayName: string | null;
+  username: string | null;
+  /** The quoted account's verified badge (gold/blue), or null when none. */
+  verified: VerifiedBadge;
+  /** Absolute https://img.pickax.com/... URL of the quoted author's avatar. */
+  avatarUrl: string | null;
+  text: string | null;
+  /** Relative timestamp as the site shows it, e.g. "2 hours ago". */
+  timestamp: string | null;
+  /** The next level of the quote chain, or null when none. */
+  quoted: QuotedPostInput | null;
 }
 
 // Everything the renderer needs. Every field is either retrieved from the

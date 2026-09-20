@@ -3,6 +3,7 @@ import {
   DEFAULT_RENDER_OPTIONS,
   type LoadedImage,
   type PostData,
+  type QuotedPost,
   type RenderOptions,
 } from "./types";
 
@@ -84,6 +85,11 @@ const BTN_GAP = 18;
 const FONT_STACK = `"Poppins", "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif`;
 // Post body text renders in Mulish on pickax.com; the card chrome stays Poppins.
 const BODY_FONT_STACK = `"Mulish", "Poppins", "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif`;
+
+// Body text metrics: line height 60px, paragraph gap 48px (pickax.com's
+// 1.25rem paragraph margin at our 40px body size).
+const TEXT_LH = 60;
+const PARA_GAP = 48;
 
 function font(px: number, weight: number = 400): string {
   return `${weight} ${px}px ${FONT_STACK}`;
@@ -420,6 +426,171 @@ function drawRichLine(
 }
 
 // ---------------------------------------------------------------------------
+// Quoted-post cards (recursive: pickax.com nests quote cards, so a
+// quote-of-a-quote renders the whole chain).
+// ---------------------------------------------------------------------------
+
+// pickax.com inner card: px-5 (20px -> 53) sides, pb-4 (16px -> 43)
+// bottom; inner header avatar ~30px -> 80, name ~15px -> 40, timestamp
+// ~12-13px -> 34; quoted text sits pt-2 (8px -> 21) below the header.
+const Q_PAD_X = 53;
+const Q_PAD_TOP = 40;
+const Q_PAD_BOTTOM = 43;
+const Q_AVATAR = 80;
+const Q_HEAD_GAP = 32;
+const Q_TEXT_GAP = 32;
+const Q_RADIUS = 32;
+const Q_BADGE_S = 32;
+
+interface QuoteMeasure {
+  lines: string[];
+  textH: number;
+  nested: QuoteMeasure | null;
+  nestedQuote: QuotedPost | null;
+  totalH: number;
+}
+
+/**
+ * Measure a quoted-post card: header + own text + the nested quoted card
+ * (if this quoted post itself quotes another). Measured exactly the way
+ * drawQuoteCard draws, so nested text can never spill outside its card.
+ */
+function measureQuote(
+  q: QuotedPost | null,
+  wrapW: number,
+  measureCtx: CanvasRenderingContext2D,
+  textWidth: (t: string) => number
+): QuoteMeasure | null {
+  if (!q || !(q.text || q.displayName)) return null;
+  measureCtx.font = bodyFont(40);
+  const lines = q.text ? wrapText(q.text, wrapW, textWidth) : [];
+  const blankCount = lines.filter((l) => l === "").length;
+  const textH =
+    (lines.length - blankCount) * TEXT_LH + blankCount * PARA_GAP;
+  // The nested card spans the padded content width of this card.
+  const nestedWrapW = wrapW - Q_PAD_X * 2 - 8;
+  const nestedQuote = q.quoted;
+  const nested =
+    nestedQuote && (nestedQuote.text || nestedQuote.displayName)
+      ? measureQuote(nestedQuote, nestedWrapW, measureCtx, textWidth)
+      : null;
+  const totalH =
+    Q_PAD_TOP +
+    Q_AVATAR +
+    (lines.length > 0 ? Q_TEXT_GAP + textH : 0) +
+    (nested ? GAP_SECTION + nested.totalH : 0) +
+    Q_PAD_BOTTOM;
+  return { lines, textH, nested, nestedQuote, totalH };
+}
+
+/**
+ * Draw a quoted-post card at (x, y) with width w: darker navy card, thin
+ * border, the quoted author's own header (avatar, name + badge, timestamp)
+ * and their full text — then the nested quoted card, exactly like
+ * pickax.com.
+ */
+function drawQuoteCard(
+  ctx: CanvasRenderingContext2D,
+  q: QuotedPost,
+  m: QuoteMeasure,
+  x: number,
+  y: number,
+  w: number
+): void {
+  roundRectPath(ctx, x, y, w, m.totalH, Q_RADIUS);
+  ctx.fillStyle = PX.quoteCard;
+  ctx.fill();
+  ctx.strokeStyle = PX.quoteBorder;
+  ctx.lineWidth = 2;
+  ctx.stroke();
+
+  let qy = y + Q_PAD_TOP;
+  const qcx = x + Q_PAD_X;
+
+  // Inner header: avatar, name + badge, timestamp on the second line.
+  ctx.save();
+  ctx.beginPath();
+  ctx.arc(qcx + Q_AVATAR / 2, qy + Q_AVATAR / 2, Q_AVATAR / 2, 0, Math.PI * 2);
+  ctx.clip();
+  if (q.avatar) {
+    ctx.drawImage(q.avatar, qcx, qy, Q_AVATAR, Q_AVATAR);
+  } else {
+    ctx.fillStyle = PX.avatarBg;
+    ctx.fillRect(qcx, qy, Q_AVATAR, Q_AVATAR);
+    const initial = (
+      q.displayName[0] ||
+      q.username[0] ||
+      "?"
+    ).toUpperCase();
+    ctx.fillStyle = PX.avatarInitial;
+    ctx.font = font(40, 600);
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(initial, qcx + Q_AVATAR / 2, qy + Q_AVATAR / 2 + 2);
+    ctx.textBaseline = "alphabetic";
+    ctx.textAlign = "left";
+  }
+  ctx.restore();
+
+  const qNameX = qcx + Q_AVATAR + Q_HEAD_GAP;
+  const qBadgeColor =
+    q.verified === "blue"
+      ? PX.badgeBlue
+      : q.verified === "gold"
+        ? PX.badgeOrange
+        : null;
+  const qNameMaxW =
+    w - Q_PAD_X * 2 - Q_AVATAR - Q_HEAD_GAP - (qBadgeColor ? Q_BADGE_S + 12 : 0);
+  // Name baseline sits in the avatar's upper half, timestamp in the lower.
+  const qNameY = qy + 34;
+  if (q.displayName) {
+    ctx.fillStyle = PX.white;
+    ctx.font = font(40, 700);
+    const shownQName = truncate(ctx, q.displayName, qNameMaxW);
+    ctx.fillText(shownQName, qNameX, qNameY);
+    if (qBadgeColor) {
+      const qNameW = ctx.measureText(shownQName).width;
+      drawVerifiedBadge(ctx, qNameX + qNameW + 12, qNameY - 13, Q_BADGE_S, qBadgeColor);
+    }
+  }
+  if (q.timestamp) {
+    ctx.fillStyle = PX.muted;
+    ctx.font = font(34);
+    ctx.fillText(
+      truncate(ctx, q.timestamp, w - Q_PAD_X * 2 - Q_AVATAR - Q_HEAD_GAP),
+      qNameX,
+      qy + 74
+    );
+  }
+  qy += Q_AVATAR;
+
+  // Quoted text, same body style as the outer post.
+  if (m.lines.length > 0) {
+    qy += Q_TEXT_GAP;
+    ctx.font = bodyFont(40);
+    let qLastAdvance = 0;
+    for (const line of m.lines) {
+      if (line === "") {
+        qy += PARA_GAP;
+        qLastAdvance = PARA_GAP;
+      } else {
+        drawRichLine(ctx, line, qcx, qy);
+        qy += TEXT_LH;
+        qLastAdvance = TEXT_LH;
+      }
+    }
+    qy -= qLastAdvance;
+  }
+
+  // The nested quoted card (quote-of-a-quote), parked inside this card
+  // after the text — the way pickax.com nests them.
+  if (m.nested && m.nestedQuote) {
+    qy += GAP_SECTION;
+    drawQuoteCard(ctx, m.nestedQuote, m.nested, qcx, qy, w - Q_PAD_X * 2);
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Renderer
 // ---------------------------------------------------------------------------
 
@@ -482,10 +653,8 @@ export async function renderPostImage(
     return w;
   };
   const lines = data.text ? wrapText(data.text, WRAP_W, textWidth) : [];
-  const TEXT_LH = 60;
   // pickax.com separates paragraphs with margin-bottom:1.25rem = 20px at
   // 15px body text = 1.333x the font size -> 48px at our 40px body size.
-  const PARA_GAP = 48;
   const blankCount = lines.filter((l) => l === "").length;
   const textH = (lines.length - blankCount) * TEXT_LH + blankCount * PARA_GAP;
 
@@ -494,30 +663,11 @@ export async function renderPostImage(
 
   // ---- quoted post (quote posts only): the inner card, measured like the
   // ---- outer text so the quoted body can never spill outside it ---------
-  // pickax.com inner card: px-5 (20px -> 53) sides, pb-4 (16px -> 43)
-  // bottom; inner header avatar ~30px -> 80, name ~15px -> 40, timestamp
-  // ~12-13px -> 34; quoted text sits pt-2 (8px -> 21) below the header.
-  const Q_PAD_X = 53;
-  const Q_PAD_TOP = 40;
-  const Q_PAD_BOTTOM = 43;
-  const Q_AVATAR = 80;
-  const Q_HEAD_GAP = 32;
-  const Q_TEXT_GAP = 32;
-  const Q_RADIUS = 32;
+  // Nested quote cards (quote-of-a-quote) measure recursively.
   const quoted = data.quoted;
   const qWrapW = CONTENT_W - Q_PAD_X * 2 - 8;
-  const qLines = quoted?.text ? wrapText(quoted.text, qWrapW, textWidth) : [];
-  const qBlankCount = qLines.filter((l) => l === "").length;
-  const qTextH =
-    (qLines.length - qBlankCount) * TEXT_LH + qBlankCount * PARA_GAP;
-  // Inner header height is set by the avatar; name (40px) + timestamp (34px)
-  // stack beside it.
-  const qHeaderH = Q_AVATAR;
-  const quotedH =
-    quoted && (quoted.text || quoted.displayName)
-      ? Q_PAD_TOP + qHeaderH + (qLines.length > 0 ? Q_TEXT_GAP + qTextH : 0) +
-        Q_PAD_BOTTOM
-      : 0;
+  const qMeasure = measureQuote(quoted ?? null, qWrapW, measure, textWidth);
+  const quotedH = qMeasure ? qMeasure.totalH : 0;
 
   const rows = o.showMedia ? layoutImages(data.images) : [];
   const imagesH =
@@ -726,96 +876,11 @@ export async function renderPostImage(
 
   // ---- quoted post: the inner card, exactly like pickax.com ---------------
   // Darker navy card, thin border, the quoted author's own header (avatar,
-  // name + their badge, timestamp) and their full text.
-  if (quoted && quotedH > 0) {
+  // name + their badge, timestamp) and their full text. Nested quotes
+  // (quote-of-a-quote) render as cards inside the card, like pickax.com.
+  if (quoted && qMeasure) {
     y += GAP_SECTION;
-    const qx = cx0;
-    const qw = CONTENT_W;
-    roundRectPath(ctx, qx, y, qw, quotedH, Q_RADIUS);
-    ctx.fillStyle = PX.quoteCard;
-    ctx.fill();
-    ctx.strokeStyle = PX.quoteBorder;
-    ctx.lineWidth = 2;
-    ctx.stroke();
-
-    let qy = y + Q_PAD_TOP;
-    const qcx = qx + Q_PAD_X;
-
-    // Inner header: avatar, name + badge, timestamp on the second line.
-    ctx.save();
-    ctx.beginPath();
-    ctx.arc(qcx + Q_AVATAR / 2, qy + Q_AVATAR / 2, Q_AVATAR / 2, 0, Math.PI * 2);
-    ctx.clip();
-    if (quoted.avatar) {
-      ctx.drawImage(quoted.avatar, qcx, qy, Q_AVATAR, Q_AVATAR);
-    } else {
-      ctx.fillStyle = PX.avatarBg;
-      ctx.fillRect(qcx, qy, Q_AVATAR, Q_AVATAR);
-      const initial = (
-        quoted.displayName[0] ||
-        quoted.username[0] ||
-        "?"
-      ).toUpperCase();
-      ctx.fillStyle = PX.avatarInitial;
-      ctx.font = font(40, 600);
-      ctx.textAlign = "center";
-      ctx.textBaseline = "middle";
-      ctx.fillText(initial, qcx + Q_AVATAR / 2, qy + Q_AVATAR / 2 + 2);
-      ctx.textBaseline = "alphabetic";
-      ctx.textAlign = "left";
-    }
-    ctx.restore();
-
-    const qNameX = qcx + Q_AVATAR + Q_HEAD_GAP;
-    const qBadgeColor =
-      quoted.verified === "blue"
-        ? PX.badgeBlue
-        : quoted.verified === "gold"
-          ? PX.badgeOrange
-          : null;
-    const Q_BADGE_S = 32;
-    const qNameMaxW =
-      qw - Q_PAD_X * 2 - Q_AVATAR - Q_HEAD_GAP - (qBadgeColor ? Q_BADGE_S + 12 : 0);
-    // Name baseline sits in the avatar's upper half, timestamp in the lower.
-    const qNameY = qy + 34;
-    if (quoted.displayName) {
-      ctx.fillStyle = PX.white;
-      ctx.font = font(40, 700);
-      const shownQName = truncate(ctx, quoted.displayName, qNameMaxW);
-      ctx.fillText(shownQName, qNameX, qNameY);
-      if (qBadgeColor) {
-        const qNameW = ctx.measureText(shownQName).width;
-        drawVerifiedBadge(ctx, qNameX + qNameW + 12, qNameY - 13, Q_BADGE_S, qBadgeColor);
-      }
-    }
-    if (quoted.timestamp) {
-      ctx.fillStyle = PX.muted;
-      ctx.font = font(34);
-      ctx.fillText(
-        truncate(ctx, quoted.timestamp, qw - Q_PAD_X * 2 - Q_AVATAR - Q_HEAD_GAP),
-        qNameX,
-        qy + 74
-      );
-    }
-    qy += qHeaderH;
-
-    // Quoted text, same body style as the outer post.
-    if (qLines.length > 0) {
-      qy += Q_TEXT_GAP;
-      ctx.font = bodyFont(40);
-      let qLastAdvance = 0;
-      for (const line of qLines) {
-        if (line === "") {
-          qy += PARA_GAP;
-          qLastAdvance = PARA_GAP;
-        } else {
-          drawRichLine(ctx, line, qcx, qy);
-          qy += TEXT_LH;
-          qLastAdvance = TEXT_LH;
-        }
-      }
-      qy -= qLastAdvance;
-    }
+    drawQuoteCard(ctx, quoted, qMeasure, cx0, y, CONTENT_W);
     y += quotedH;
   }
 

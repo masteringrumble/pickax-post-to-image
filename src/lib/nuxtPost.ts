@@ -43,6 +43,12 @@ export interface NuxtQuotedPost extends NuxtPostAuthor {
   createdAt: string;
   /** Relative time as the site shows it, e.g. "2 hours ago". */
   timeAgo: string;
+  /**
+   * The post this quoted post itself quotes (quote-of-a-quote chains),
+   * or null when it quotes nothing. Pickax nests these cards, so we keep
+   * the whole chain.
+   */
+  quoted: NuxtQuotedPost | null;
 }
 
 export interface NuxtLinkCard {
@@ -338,6 +344,29 @@ function authorFromUser(user: unknown): NuxtPostAuthor {
 }
 
 /**
+ * Build a NuxtQuotedPost from a repostOf node, following its own repostOf
+ * chain so quote-of-a-quote (of a quote...) keeps every level. Guards
+ * against pathological cycles with a depth cap.
+ */
+function quotedFromNode(node: PostNode, depth = 0): NuxtQuotedPost | null {
+  if (depth > 8) return null;
+  const qAuthor = authorFromUser(node.user);
+  const qCreatedAt = str(node.createdAt);
+  const inner = node.repostOf;
+  return {
+    ...qAuthor,
+    postId: String(node.id ?? ""),
+    text: cleanPostText(str(node.content)),
+    createdAt: qCreatedAt,
+    timeAgo: timeAgoFromIso(qCreatedAt),
+    quoted:
+      inner && typeof inner === "object" && isPostNode(inner)
+        ? quotedFromNode(inner as PostNode, depth + 1)
+        : null,
+  };
+}
+
+/**
  * Parse a __NUXT_DATA__ block and extract the outer post plus, when this
  * is a quote post, the quoted post (postId, author with badge, avatar,
  * text, timestamp). Returns null when the block isn't a usable payload.
@@ -369,15 +398,7 @@ export function parseNuxtPostData(
   let quoted: NuxtQuotedPost | null = null;
   const repostOf = post.repostOf;
   if (isPostNode(repostOf)) {
-    const qAuthor = authorFromUser(repostOf.user);
-    const qCreatedAt = str(repostOf.createdAt);
-    quoted = {
-      ...qAuthor,
-      postId: String(repostOf.id ?? ""),
-      text: cleanPostText(str(repostOf.content)),
-      createdAt: qCreatedAt,
-      timeAgo: timeAgoFromIso(qCreatedAt),
-    };
+    quoted = quotedFromNode(repostOf);
   }
 
   return {
