@@ -138,6 +138,10 @@ console.log("ok  content.js extraction (quote post, badges, no-image rule)");
 <div><a href="/DiamondandSilk">@DiamondandSilk</a></div>
 <img src="https://img.pickax.com/post-710273/photo1.jpeg" alt="post image">
 <img src="https://img.pickax.com/post-710273/photo2.jpeg" alt="post image">
+<div class="actions">
+<button><svg><stop stop-color="#0083f5"/></svg><span>42</span></button>
+<button><svg><path fill="#dc1919"/></svg><span>7</span></button>
+</div>
 <div class="comment-box"><img src="${viewerAv}" class="rounded-full"></div>
 <script id="__NUXT_DATA__" type="application/json">${nuxt2}</script>
 </body></html>`;
@@ -164,6 +168,8 @@ console.log("ok  content.js extraction (quote post, badges, no-image rule)");
     ],
     "viewer avatars excluded from post images"
   );
+  assert.equal(o2.picks, "42", "post-page blue pick icon detected");
+  assert.equal(o2.axes, "7", "post-page red axe icon detected");
   console.log("ok  content.js on logged-in page (avatar + images)");
 }
 
@@ -265,16 +271,41 @@ console.log("ok  content.js extraction (quote post, badges, no-image rule)");
     "Bob post text", // 5
     { fullname: "Bob B", username: "bob", avatar: "u-bob/b.jpeg" }, // 6
   ]);
-  function feedCard(id, user, name, av, text, picks, axes, img) {
-    return `<div class="card" id="card-${id}">
-<div><a href="/${user}">${name}</a></div>
+  // Mirrors the real logged-out feed card: an empty full-bleed /post/ overlay
+  // anchor first, then header, body, media, and the engagement row:
+  // pick (count) | axe (icon-only, NO count on the feed) | comment (count) |
+  // two trailing icon-only buttons. The pick icon uses a red-yellow
+  // gradient, NOT the post page's blue scheme.
+  // Card 1 uses color hints; card 2's buttons carry no color hints at all so
+  // the order fallback (pick first, axe second) is exercised — and its
+  // comment count must NOT leak into axes.
+  var GRADIENT_PICK_SVG =
+    '<svg viewBox="0 0 24 24"><defs><linearGradient><stop stop-color="#FD5E5E"/><stop stop-color="#FDCF5E"/></linearGradient></defs><path d="M0 0h24v24H0z"/></svg>';
+  var PLAIN_PICK_SVG =
+    '<svg viewBox="0 0 24 24"><path d="M0 0h24v24H0z"/></svg>';
+  var AXE_ICON_SVG =
+    '<svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18" stroke="gray"/></svg>';
+  function commentBtn(n) {
+    return `<button class="relative flex"><div class="flex gap-2 opacity-50"><div class="w-5 h-5"><svg viewBox="0 0 24 24"><path d="M12 16L7 21V16H5C3.9 16 3 15.1 3 14V5C3 3.9 3.9 3 5 3H19C20.1 3 21 3.9 21 5V14C21 15.1 20.1 16 19 16H12Z" fill="white"/></svg></div><div>${n}</div></div></button>`;
+  }
+  function feedCard(id, user, name, av, text, img, o) {
+    var pickSvg = o.plain ? PLAIN_PICK_SVG : GRADIENT_PICK_SVG;
+    var axeBtn =
+      o.axe === "counted"
+        ? `<button class="relative flex">${PLAIN_PICK_SVG}<div class="flex gap-1"><div>${o.axeN}</div></div></button>`
+        : `<button class="relative flex">${AXE_ICON_SVG}</button>`;
+    return `<div class="card relative" id="card-${id}">
+<a href="/post/${id}" class="absolute top-0 left-0 w-full h-full cursor-pointer z-0"></a>
+<div><a href="/${user}">${name}</a><button>Follow</button></div>
 <div><a href="/${user}">@${user}</a><span title="Sep 20, 2026">${text}</span></div>
-<a href="/${user}"><img src="https://img.pickax.com/${av}" class="rounded-full"></a>
-<a href="/post/${id}">2 hours ago</a>
+<a href="/${user}"><img src="https://img.pickax.com/${av}" class="rounded-full object-cover w-10 h-10 min-w-10"></a>
 <img src="https://img.pickax.com/${img}" alt="post image">
 <div class="actions">
-<button><svg><stop stop-color="#0083f5"/></svg><span>${picks}</span></button>
-<button><svg><stop stop-color="#dc1919"/></svg><span>${axes}</span></button>
+<button class="relative flex">${pickSvg}<div class="flex gap-1"><div>${o.picks}</div></div></button>
+${axeBtn}
+${commentBtn(o.commentN)}
+<button class="relative flex">${AXE_ICON_SVG}</button>
+<button class="relative flex">${AXE_ICON_SVG}</button>
 </div>
 </div>`;
   }
@@ -282,19 +313,29 @@ console.log("ok  content.js extraction (quote post, badges, no-image rule)");
 <meta property="og:title" content="Pickax">
 </head><body>
 <div id="feed">
-${feedCard("111111", "alice", "Alice A", "u-alice/a.jpeg", "2 hours ago", "5", "1", "p-111/photo.jpeg")}
-${feedCard("222222", "bob", "Bob B", "u-bob/b.jpeg", "3 hours ago", "9", "0", "p-222/photo.jpeg")}
+${feedCard("111111", "alice", "Alice A", "u-alice/a.jpeg", "2 hours ago", "p-111/photo.jpeg", { picks: "5", commentN: "12", axe: "icon" })}
+${feedCard("222222", "bob", "Bob B", "u-bob/b.jpeg", "3 hours ago", "p-222/photo.jpeg", { picks: "9", commentN: "3", axe: "counted", axeN: "2", plain: true })}
 </div>
 <script id="__NUXT_DATA__" type="application/json">${nuxtFeed}</script>
 </body></html>`;
   const domF = new JSDOM(htmlFeed, { url: "https://pickax.com/" });
   delete globalThis.__pickaxPostToImageInjected; // allow re-eval in the test harness
+  // Stub the extension API so the button renders its icon image. (The test
+  // harness evals content.js with Node as globalThis, so stub it there.)
+  globalThis.chrome = {
+    runtime: {
+      getURL: function (p) {
+        return "chrome-extension://fakeid/" + p;
+      },
+    },
+  };
   const factoryF = new domF.window.Function(
     "document",
     "location",
     src + "\nreturn globalThis.__pickaxExtractPost;"
   );
   const extractF = factoryF(domF.window.document, domF.window.location);
+  delete globalThis.chrome; // don't leak the stub into other sections
 
   // The content script auto-scans on load: one button per card.
   const btns = domF.window.document.querySelectorAll("[data-ppi-btn]");
@@ -306,6 +347,32 @@ ${feedCard("222222", "bob", "Bob B", "u-bob/b.jpeg", "3 hours ago", "9", "0", "p
     .sort();
   assert.deepEqual(btnIds, ["111111", "222222"], "buttons carry their card's post id");
 
+  // The button uses the site's light-blue icon image, not an emoji.
+  const btnImg = btns[0].querySelector("img");
+  assert.ok(btnImg, "button contains the brand icon image");
+  assert.ok(
+    btnImg.getAttribute("src").indexOf("icons/icon-32.png") !== -1,
+    "button icon is the extension's blue icon"
+  );
+  assert.ok(
+    btns[0].textContent.indexOf("📷") === -1,
+    "no camera emoji in the button"
+  );
+  assert.equal(
+    btns[0].parentElement.className,
+    "actions",
+    "button parks in the card's action row"
+  );
+  assert.equal(
+    btns[0].parentElement.lastElementChild,
+    btns[0],
+    "button sits after the row's trailing icon-only buttons"
+  );
+  assert.ok(
+    btns[0].style.position === "relative" && btns[0].style.zIndex === "1",
+    "button sits above the card's full-bleed overlay link"
+  );
+
   // Scoped extraction: no cross-card bleed.
   const card1 = domF.window.document.getElementById("card-111111");
   const card2 = domF.window.document.getElementById("card-222222");
@@ -315,8 +382,12 @@ ${feedCard("222222", "bob", "Bob B", "u-bob/b.jpeg", "3 hours ago", "9", "0", "p
   assert.equal(f1.username, "alice");
   assert.equal(f1.displayName, "Alice A");
   assert.equal(f1.text, "Alice post text");
-  assert.equal(f1.picks, "5");
-  assert.equal(f1.axes, "1");
+  assert.equal(f1.picks, "5", "gradient pick icon detected");
+  assert.equal(
+    f1.axes,
+    "",
+    "feed axe button is icon-only: no public count, so no number"
+  );
   assert.equal(
     f1.avatarUrl,
     "https://img.pickax.com/u-alice/a.jpeg",
@@ -326,7 +397,12 @@ ${feedCard("222222", "bob", "Bob B", "u-bob/b.jpeg", "3 hours ago", "9", "0", "p
   assert.equal(f2.postId, "222222");
   assert.equal(f2.username, "bob");
   assert.equal(f2.text, "Bob post text");
-  assert.equal(f2.picks, "9");
+  assert.equal(f2.picks, "9", "order fallback finds picks without color hints");
+  assert.equal(
+    f2.axes,
+    "2",
+    "order fallback finds axes without color hints, comment count excluded"
+  );
   assert.equal(
     f2.avatarUrl,
     "https://img.pickax.com/u-bob/b.jpeg",

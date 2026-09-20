@@ -13,8 +13,8 @@
 >
 > HOW IT WORKS
 > 1. Install the extension and browse pickax.com as usual.
-> 2. Every post gets a small "📷 Image" button in its action row — in your
->    feed and on post pages.
+> 2. Every post gets a small "Image" button (with the Pickax Post to Image
+>    icon) in its action row — in your feed and on post pages.
 > 3. Click it: the post is captured (author, avatar, full text, timestamp,
 >    picks, axes, views, images — including quoted posts with both authors'
 >    verification badges) and the PNG downloads automatically. No website

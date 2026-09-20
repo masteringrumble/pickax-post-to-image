@@ -27,6 +27,27 @@
   var SCANNED_ROOT = "data-ppi-scanned";
   var BTN_ATTR = "data-ppi-btn";
 
+  // An engagement button (pick / axe / comment): a real page button holding
+  // an icon SVG plus a numeric count. Color-agnostic — Pickax restyles these
+  // icons (feed vs post page), so hex sniffing breaks across surfaces.
+  function isEngagementButton(b) {
+    if (!b || !b.innerHTML) return false;
+    if (b.hasAttribute && b.hasAttribute(BTN_ATTR)) return false; // ours
+    if (b.innerHTML.indexOf("<svg") === -1) return false;
+    return /(\d[\d,]*)/.test(b.textContent || "");
+  }
+
+  function engagementCount(b) {
+    var m = (b.textContent || "").match(/(\d[\d,]*)/);
+    return m ? m[1] : "";
+  }
+
+  // Comment buttons carry a speech-bubble icon; their counts must never be
+  // mistaken for axe counts.
+  function isCommentButton(b) {
+    return (b.innerHTML || "").indexOf("M12 16L7 21") > -1;
+  }
+
   function cleanText(s) {
     return String(s || "")
       .replace(/<br\s*\/?>/gi, "\n")
@@ -211,15 +232,29 @@
       if (vm) o.views = vm[1];
     }
 
+    // Engagement buttons: pick / axe / comment render as icon-SVG + numeric
+    // count (the feed's axe button is icon-only with no public count).
+    // Identify pick vs axe by icon colors when present (feed: red-yellow
+    // gradient; post pages: blue/red scheme); fall back to row order —
+    // Pickax renders pick first, axe second. Comment buttons are excluded
+    // via their speech-bubble icon so comment counts never leak into axes.
+    var engBtns = [];
     Array.prototype.forEach.call(qa("button"), function (b) {
-      // Skip our own injected button.
-      if (b.hasAttribute && b.hasAttribute(BTN_ATTR)) return;
-      var h = b.innerHTML || "",
-        t = (b.textContent || "").trim(),
-        m = t.match(/(\d[\d,]*)/);
-      if (h.indexOf("0083f5") > -1 && !o.picks) o.picks = m ? m[1] : "0";
-      if (h.indexOf("dc1919") > -1 && !o.axes) o.axes = m ? m[1] : "0";
+      if (isEngagementButton(b) && !isCommentButton(b)) engBtns.push(b);
     });
+    Array.prototype.forEach.call(engBtns, function (b) {
+      var h = b.innerHTML || "";
+      if (
+        !o.picks &&
+        (h.indexOf("0083f5") > -1 ||
+          h.indexOf("FD5E5E") > -1 ||
+          h.indexOf("FDCF5E") > -1)
+      )
+        o.picks = engagementCount(b);
+      else if (!o.axes && h.indexOf("dc1919") > -1) o.axes = engagementCount(b);
+    });
+    if (!o.picks && engBtns.length > 0) o.picks = engagementCount(engBtns[0]);
+    if (!o.axes && engBtns.length > 1) o.axes = engagementCount(engBtns[1]);
 
     var fr = q('iframe[src*="rumble.com/embed"]');
     if (fr) {
@@ -417,16 +452,10 @@
   function findCardRoot(anchor) {
     var el = anchor.parentElement;
     for (var i = 0; i < 12 && el && el !== document.body; i++) {
-      var hasEng = false;
       var btns = el.querySelectorAll("button");
       for (var b = 0; b < btns.length; b++) {
-        var h = btns[b].innerHTML || "";
-        if (h.indexOf("0083f5") > -1 || h.indexOf("dc1919") > -1) {
-          hasEng = true;
-          break;
-        }
+        if (isEngagementButton(btns[b])) return el;
       }
-      if (hasEng) return el;
       el = el.parentElement;
     }
     return document.documentElement;
@@ -451,9 +480,9 @@
   }
 
   function onMakeImage(postId, cardRoot, btn) {
-    var old = btn.textContent;
+    var old = btn.innerHTML;
     btn.disabled = true;
-    btn.textContent = "Rendering…";
+    btn.innerHTML = "Rendering…";
     var payload = null;
     try {
       payload = extractPost(cardRoot, postId);
@@ -462,7 +491,7 @@
     }
     function done(msg) {
       btn.disabled = false;
-      btn.textContent = old;
+      btn.innerHTML = old;
       if (msg) toast(msg);
     }
     if (!payload || !payload.postId) {
@@ -489,11 +518,24 @@
     btn.setAttribute(BTN_ATTR, postId);
     btn.type = "button";
     btn.title = "Turn this post into a PNG image";
-    btn.textContent = "📷 Image";
+    // The site's light-blue icon, same as the website's branding.
+    var iconUrl =
+      api && api.runtime && api.runtime.getURL
+        ? api.runtime.getURL("icons/icon-32.png")
+        : "";
+    btn.innerHTML = iconUrl
+      ? '<img src="' +
+        iconUrl +
+        '" alt="" style="width:14px;height:14px;vertical-align:-2px;' +
+        'margin-right:4px;border-radius:3px;pointer-events:none;">Image'
+      : "Image";
     btn.style.cssText =
       "margin-left:8px;padding:3px 10px;border-radius:9999px;flex:none;" +
       "border:1px solid #3A4358;background:#333D52;color:#fff;" +
-      "font-size:12px;line-height:1.6;cursor:pointer;font-family:inherit;";
+      "font-size:12px;line-height:1.6;cursor:pointer;font-family:inherit;" +
+      // The card's full-bleed /post/ overlay link sits at z-index 0 — stay
+      // positioned above it so the button actually receives clicks.
+      "position:relative;z-index:1;";
     btn.addEventListener("mouseenter", function () {
       btn.style.background = "#3EB1F9";
       btn.style.borderColor = "#3EB1F9";
@@ -508,25 +550,33 @@
       onMakeImage(postId, cardRoot, btn);
     });
 
-    // Park it in the action row: after the last engagement button.
+    // Park it at the end of the action row: locate the row via the last
+    // counted engagement button, then insert after the row's final button
+    // (covers trailing icon-only buttons like the feed's axe/share).
     var target = null;
     var btns = cardRoot.querySelectorAll("button");
-    for (var i = btns.length - 1; i >= 0; i--) {
-      var b = btns[i];
+    var i, b;
+    for (i = btns.length - 1; i >= 0; i--) {
+      b = btns[i];
       if (b.hasAttribute(BTN_ATTR)) continue;
-      var h = b.innerHTML || "";
-      if (
-        h.indexOf("0083f5") > -1 ||
-        h.indexOf("dc1919") > -1 ||
-        h.indexOf("17.3333 21") > -1 || // share
-        h.indexOf("7.75776 6.572") > -1 // comment
-      ) {
+      if (isEngagementButton(b)) {
         target = b.parentElement;
         break;
       }
     }
-    if (target) target.appendChild(btn);
-    else cardRoot.appendChild(btn);
+    if (target) {
+      var rowBtns = target.querySelectorAll("button");
+      var last = null;
+      for (i = rowBtns.length - 1; i >= 0; i--) {
+        if (!rowBtns[i].hasAttribute(BTN_ATTR)) {
+          last = rowBtns[i];
+          break;
+        }
+      }
+      target.insertBefore(btn, last ? last.nextSibling : null);
+    } else {
+      cardRoot.appendChild(btn);
+    }
   }
 
   // Group post links by card; the first link (document order) that maps to a
