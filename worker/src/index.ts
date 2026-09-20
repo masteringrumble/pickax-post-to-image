@@ -11,6 +11,16 @@ import {
   type NuxtPostData,
   type NuxtQuotedPost,
 } from "../../src/lib/nuxtPost";
+import {
+  igAuthStart,
+  igAuthCallback,
+  igStatus,
+  igDisconnect,
+  igStage,
+  igStageGet,
+  igPublish,
+  type IgEnv,
+} from "./instagram";
 
 const POST_URL_RE = /^https?:\/\/(?:www\.)?pickax\.com\/post\/(\d+)(?:[/?#].*)?$/i;
 
@@ -397,17 +407,31 @@ function jsonResponse(data: unknown, status = 200): Response {
 }
 
 export default {
-  async fetch(request: Request): Promise<Response> {
+  async fetch(request: Request, env: IgEnv): Promise<Response> {
     const url = new URL(request.url);
 
     if (request.method === "OPTIONS") {
       return new Response(null, {
         headers: {
           "Access-Control-Allow-Origin": "*",
-          "Access-Control-Allow-Methods": "GET, OPTIONS",
+          "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+          "Access-Control-Allow-Headers": "Content-Type",
         },
       });
     }
+
+    // ---- Instagram sharing (see worker/src/instagram.ts) ----
+    if (url.pathname === "/ig/auth/start") return igAuthStart(request, env);
+    if (url.pathname === "/ig/auth/callback") return igAuthCallback(request, env);
+    if (url.pathname === "/ig/status") return igStatus(request, env);
+    if (url.pathname === "/ig/disconnect") return igDisconnect(request, env);
+    if (url.pathname === "/ig/stage" && request.method === "POST") return igStage(request, env);
+    if (url.pathname.startsWith("/ig/stage/")) {
+      const id = url.pathname.slice("/ig/stage/".length);
+      if (/^[0-9a-f]{32}$/.test(id)) return igStageGet(env, id);
+      return jsonResponse({ error: "not-found" }, 404);
+    }
+    if (url.pathname === "/ig/publish" && request.method === "POST") return igPublish(request, env);
 
     if (url.pathname === "/img") {
       const target = (url.searchParams.get("url") ?? "").trim();
