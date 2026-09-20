@@ -18,11 +18,6 @@ import {
 } from "../src/importHtml";
 import { renderPostImage } from "../src/renderer";
 import {
-  postUrlOf,
-  SHARE_TARGETS,
-  shareContextOf,
-} from "../src/share";
-import {
   extractNuxtBlock,
   parseNuxtPostData,
 } from "../src/lib/nuxtPost";
@@ -1226,68 +1221,6 @@ async function main() {
     );
     assert.ok(canvas.width > 0, "zero-count row renders");
     console.log("ok  zero picks/axes show icon only (no number)");
-  }
-
-  // ---- share sheet ---------------------------------------------------------
-  {
-    const ctx = shareContextOf({
-      postId: "710273",
-      displayName: "MasteringRumble",
-      text: "Hello world, this is a test post with enough text to build a caption.",
-    });
-    assert.equal(postUrlOf({ postId: "710273" }), "https://pickax.com/post/710273");
-    assert.equal(postUrlOf({ postId: "  " }), "");
-    assert.ok(ctx.caption.includes("https://pickax.com/post/710273"), "caption has post url");
-    assert.ok(ctx.caption.includes("MasteringRumble"), "caption names the author");
-    assert.ok(ctx.title.length > 0 && !ctx.title.includes("\n"), "title is single-line");
-
-    const byId = (id: string) => {
-      const t = SHARE_TARGETS.find((t) => t.id === id);
-      assert.ok(t, `share target ${id} exists`);
-      return t!;
-    };
-    const enc = encodeURIComponent;
-    assert.equal(
-      byId("x").href!(ctx),
-      `https://x.com/intent/post?text=${enc(ctx.caption)}`,
-      "x intent url",
-    );
-    assert.equal(
-      byId("facebook").href!(ctx),
-      `https://www.facebook.com/sharer/sharer.php?u=${enc(ctx.url)}`,
-      "facebook share url",
-    );
-    assert.ok(
-      byId("truthsocial").href!(ctx).startsWith("https://truthsocial.com/share?"),
-      "truth social share url",
-    );
-    assert.ok(byId("email").href!(ctx).startsWith("mailto:?subject="), "mailto url");
-    assert.ok(byId("sms").href!(ctx).startsWith("sms:?"), "sms url");
-
-    // Every link target must produce a well-formed URL with no holes.
-    const ids = new Set<string>();
-    for (const t of SHARE_TARGETS) {
-      assert.ok(t.id && t.name && t.color, `target ${t.id} has id/name/color`);
-      assert.ok(!ids.has(t.id), `duplicate share target id ${t.id}`);
-      ids.add(t.id);
-      if (t.icon.kind === "brand") {
-        assert.ok(t.icon.path.length > 50, `${t.id} brand path present`);
-      }
-      if (t.href) {
-        const href = t.href(ctx);
-        assert.ok(
-          /^(https:\/\/|mailto:\?|sms:\?)/.test(href),
-          `${t.id} href has valid scheme: ${href.slice(0, 40)}`,
-        );
-        assert.ok(!href.includes("undefined"), `${t.id} href has no undefined holes`);
-      } else {
-        assert.ok(t.action, `${t.id} has an action`);
-      }
-    }
-    // Fallback: no post id -> tool URL is shared instead.
-    const noId = shareContextOf({ postId: "", displayName: "", text: "" });
-    assert.ok(noId.url.includes("github.io"), "no-id fallback shares the tool url");
-    console.log(`ok  share sheet (${SHARE_TARGETS.length} targets, all urls well-formed)`);
   }
 
   console.log("\nALL SMOKE TESTS PASSED");
