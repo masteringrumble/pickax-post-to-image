@@ -116,6 +116,17 @@ async function postDataFromWorker(
     }
   }
 
+  // The shared-website link card: load its preview image like any other
+  // post image. When it fails, the card still renders domain + title.
+  let linkImage: LoadedImage | null = null;
+  if (p.linkCard?.imageUrl) {
+    try {
+      linkImage = toLoaded(await loadCdnImage(p.linkCard.imageUrl));
+    } catch {
+      /* link card renders without its preview image */
+    }
+  }
+
   // The quoted post (quote posts only): the quoted author's own avatar,
   // badge, and full text — exactly as the inner card on pickax.com shows.
   let quotedAvatar: HTMLImageElement | null = null;
@@ -143,6 +154,15 @@ async function postDataFromWorker(
     },
     video: p.video
       ? { src: p.video.src, title: p.video.title, thumbnail: videoThumb }
+      : null,
+    linkCard: p.linkCard
+      ? {
+          url: p.linkCard.url,
+          domain: p.linkCard.domain,
+          title: p.linkCard.title,
+          description: p.linkCard.description ?? "",
+          image: linkImage,
+        }
       : null,
     quoted: p.quoted
       ? {
@@ -302,6 +322,17 @@ export default function App() {
       }
     }
 
+    // The shared-website link card: load its preview image like any other
+    // post image. When it fails, the card still renders domain + title.
+    let linkImage: LoadedImage | null = null;
+    if (p.linkCard?.imageUrl) {
+      try {
+        linkImage = toLoaded(await loadCdnImage(p.linkCard.imageUrl));
+      } catch {
+        /* link card renders without its preview image */
+      }
+    }
+
     // The quoted post (quote posts only): the quoted author's own avatar,
     // badge, and full text — exactly as the inner card on pickax.com shows.
     let quotedAvatar: HTMLImageElement | null = null;
@@ -331,6 +362,15 @@ export default function App() {
         p.videoSrc || p.videoTitle
           ? { src: p.videoSrc, title: p.videoTitle, thumbnail: videoThumb }
           : null,
+      linkCard: p.linkCard
+        ? {
+            url: p.linkCard.url,
+            domain: p.linkCard.domain,
+            title: p.linkCard.title,
+            description: p.linkCard.description,
+            image: linkImage,
+          }
+        : null,
       quoted: p.quoted
         ? {
             postId: p.quoted.postId,

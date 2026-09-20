@@ -43,6 +43,14 @@ export interface WorkerPostPayload {
   verified: VerifiedBadge;
   images: string[];
   video: WorkerPostVideo | null;
+  /** The shared-website link card, or null when the post shares no link. */
+  linkCard: {
+    url: string;
+    title: string;
+    domain: string;
+    imageUrl: string;
+    description: string;
+  } | null;
   /** The quoted post, or null when this is not a quote post. */
   quoted: WorkerQuotedPost | null;
   fetchedAt: string;

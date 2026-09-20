@@ -16,8 +16,10 @@
 //
 // The post object carries: id, content (HTML with <br> breaks), createdAt
 // (ISO), user { fullname, username, avatar (relative img.pickax.com path),
-// is_verified, creator }, and repostOf -> the quoted post object (same
-// shape) when this is a quote post.
+// is_verified, creator }, attachments [{ url, type: "image", ... }] (the
+// post's OWN attached images), link { url, title, image, description }
+// (the shared-website link card, when the post shares one), and repostOf ->
+// the quoted post object (same shape) when this is a quote post.
 //
 // Verified badge rule, verified against the live site: creator non-null
 // means the gold "Verified Creator" seal; is_verified true with a null
@@ -43,6 +45,19 @@ export interface NuxtQuotedPost extends NuxtPostAuthor {
   timeAgo: string;
 }
 
+export interface NuxtLinkCard {
+  /** The full shared URL. */
+  url: string;
+  /** The link's title, as Pickax shows it under the preview image. */
+  title: string;
+  /** Bare domain, e.g. "trendingpoliticsnews.com". */
+  domain: string;
+  /** Absolute https://img.pickax.com/metadata/... preview image URL. */
+  imageUrl: string;
+  /** The link's description, when the payload carries one. */
+  description: string;
+}
+
 export interface NuxtPostData {
   postId: string;
   /** Cleaned plain text of the outer post. */
@@ -52,6 +67,17 @@ export interface NuxtPostData {
   createdAt: string;
   /** The quoted post, or null when this is not a quote post. */
   quoted: NuxtQuotedPost | null;
+  /**
+   * The post's OWN attached images, from the payload's attachments list
+   * (type "image") — the authoritative source. A link card's preview image
+   * (img.pickax.com/metadata/...) is never in here; it belongs to linkCard.
+   */
+  images: string[];
+  /**
+   * The shared-website link card (post.link in the payload), or null when
+   * the post shares no link. Generic: works for any website a person shares.
+   */
+  linkCard: NuxtLinkCard | null;
 }
 
 const IMG_CDN = "https://img.pickax.com/";
@@ -242,6 +268,55 @@ function str(v: unknown): string {
   return typeof v === "string" ? v : v == null ? "" : String(v);
 }
 
+/** Bare domain from a URL ("www." stripped); "" when unparseable. */
+export function hostOf(rawUrl: string): string {
+  const u = str(rawUrl).trim();
+  if (!u) return "";
+  try {
+    return new URL(u).hostname.replace(/^www\./i, "");
+  } catch {
+    const m = u.match(/^[a-z][a-z0-9+.-]*:\/\/([^/?#:]+)/i);
+    return m ? m[1].replace(/^www\./i, "") : "";
+  }
+}
+
+/**
+ * The post's own attached images: payload attachments with type "image",
+ * made absolute. Link-card preview images live under img.pickax.com/metadata/
+ * and belong to linkCard, never here.
+ */
+function imagesFromPost(post: PostNode): string[] {
+  const atts = post.attachments;
+  if (!Array.isArray(atts)) return [];
+  const urls: string[] = [];
+  for (const a of atts) {
+    if (!a || typeof a !== "object") continue;
+    const att = a as PostNode;
+    if (str(att.type).toLowerCase() !== "image") continue;
+    const p = str(att.url);
+    if (!p || urls.length >= 4) continue;
+    const abs = /^https?:\/\//i.test(p) ? p : IMG_CDN + p;
+    if (!urls.includes(abs)) urls.push(abs);
+  }
+  return urls;
+}
+
+/** The shared-website link card from post.link, or null when none. */
+function linkCardFromPost(post: PostNode): NuxtLinkCard | null {
+  const l = post.link;
+  if (!l || typeof l !== "object") return null;
+  const link = l as PostNode;
+  const url = str(link.url) || str(link.inputUrl);
+  if (!url) return null;
+  return {
+    url,
+    title: str(link.title),
+    domain: hostOf(url),
+    imageUrl: str(link.image),
+    description: str(link.description),
+  };
+}
+
 function badgeFromUser(user: PostNode | null | undefined): VerifiedBadge {
   if (!user || typeof user !== "object") return null;
   // Gold "Verified Creator" when the creator record exists; blue when the
@@ -305,7 +380,15 @@ export function parseNuxtPostData(
     };
   }
 
-  return { postId: String(post.id ?? postId), text, author, createdAt, quoted };
+  return {
+    postId: String(post.id ?? postId),
+    text,
+    author,
+    createdAt,
+    quoted,
+    images: imagesFromPost(post),
+    linkCard: linkCardFromPost(post),
+  };
 }
 
 /** Pull the raw __NUXT_DATA__ block out of a page source string. */

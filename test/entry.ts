@@ -17,6 +17,10 @@ import {
   prettyTimestamp,
 } from "../src/importHtml";
 import { renderPostImage } from "../src/renderer";
+import {
+  extractNuxtBlock,
+  parseNuxtPostData,
+} from "../src/lib/nuxtPost";
 
 // ---- minimal canvas 2d context stub ---------------------------------------
 function makeCtx(): any {
@@ -576,6 +580,195 @@ async function main() {
       console.log("ok  logged-in page: viewer avatars excluded (paste-source)");
     }
 
+    // Shared-website link card: the payload's attachments are the
+    // authoritative post images (the link card's metadata/ preview image
+    // must NOT leak into them), and post.link becomes the link card with
+    // its domain + title. Regression: post 710273's Murkowski photo is the
+    // link preview — it used to render as a regular post image.
+    {
+      const LINK_POST_ID = "710273";
+      const linkNuxt = JSON.stringify([
+        {
+          id: 710273,
+          content:
+            "Residents in the remote Alaska village of Savoonga are pushing back.<br><br>Second paragraph.",
+          createdAt: "2026-09-20T00:31:34.944Z",
+          user: {
+            fullname: "Diamond and Silk",
+            username: "DiamondandSilk",
+            avatar: "user-35295/ds.jpeg",
+            is_verified: true,
+          },
+          attachments: [
+            { url: "user-35295/graphic.jpeg", type: "image" },
+            { url: "user-35295/clip.mp4", type: "video" },
+          ],
+          link: {
+            url: "https://trendingpoliticsnews.com/rural-alaskans-push-back/?utm_source=DS21",
+            image: "https://img.pickax.com/metadata/abc123.jpeg",
+            title: "Rural Alaskans Push Back On Murkowski’s SAVE America Act Warning",
+            inputUrl:
+              "https://trendingpoliticsnews.com/rural-alaskans-push-back/?utm_source=DS21",
+            description: "Alaska Sen. Lisa Murkowski is facing criticism.",
+          },
+        },
+      ]);
+      const LINK_HTML = `<!DOCTYPE html><html><head>
+<meta property="og:title" content="Diamond and Silk posted">
+<meta property="og:description" content="Residents in the remote Alaska village of Savoonga are pushing back. user=diamondandsilk 100 Followers">
+<meta property="og:url" content="https://pickax.com/post/710273">
+</head><body>
+<div><a href="/DiamondandSilk"><img src="https://img.pickax.com/user-35295/ds.jpeg" class="rounded-full"></a></div>
+<div><a href="/DiamondandSilk">@DiamondandSilk</a></div>
+<div class="text-light2 font-light group relative overflow-clip rounded-lg bg-dark3">
+<a target="_blank" href="user-35295/graphic.jpeg"><img src="https://img.pickax.com/user-35295/graphic.jpeg" alt loading="lazy" class="w-full h-full object-cover"></a>
+</div>
+<div class="font-light text-sm bg-dark3/70 rounded-lg relative p-3 mt-4" title="Rural Alaskans Push Back On Murkowski’s SAVE America Act Warning">
+<a href="https://trendingpoliticsnews.com/rural-alaskans-push-back/?utm_source=DS21" target="_blank" class="mb-1 flex">
+<img src="https://img.pickax.com/metadata/abc123.jpeg" alt="link preview" class="rounded-t-lg w-full aspect-video object-cover">
+</a>
+<div class="p-2 flex flex-col gap-1">
+<a href="https://trendingpoliticsnews.com/rural-alaskans-push-back/?utm_source=DS21" target="_blank" class="flex text-[12px] text-light2 hover:underline">trendingpoliticsnews.com</a>
+<a href="https://trendingpoliticsnews.com/rural-alaskans-push-back/?utm_source=DS21" target="_blank" class="flex text-[15px] hover:underline">Rural Alaskans Push Back On Murkowski’s SAVE America Act Warning</a>
+</div>
+</div>
+<script id="__NUXT_DATA__" type="application/json">${linkNuxt}</script>
+</body></html>`;
+
+      // Payload parser: attachments + link card, video attachments skipped.
+      const nuxtBlock = extractNuxtBlock(LINK_HTML);
+      assert.ok(nuxtBlock, "nuxt block extracted");
+      const nuxt = parseNuxtPostData(nuxtBlock!, LINK_POST_ID);
+      assert.ok(nuxt, "payload parsed");
+      assert.deepEqual(
+        nuxt!.images,
+        ["https://img.pickax.com/user-35295/graphic.jpeg"],
+        "attachments are the post images (video skipped)"
+      );
+      assert.ok(nuxt!.linkCard, "link card parsed from payload");
+      assert.equal(
+        nuxt!.linkCard!.url,
+        "https://trendingpoliticsnews.com/rural-alaskans-push-back/?utm_source=DS21"
+      );
+      assert.equal(nuxt!.linkCard!.domain, "trendingpoliticsnews.com");
+      assert.equal(
+        nuxt!.linkCard!.title,
+        "Rural Alaskans Push Back On Murkowski’s SAVE America Act Warning"
+      );
+      assert.equal(
+        nuxt!.linkCard!.imageUrl,
+        "https://img.pickax.com/metadata/abc123.jpeg"
+      );
+      console.log("ok  payload parser: attachments + link card");
+
+      // Paste-source: the link preview image must not be a post image.
+      const lp2 = parsePostHtml(LINK_HTML);
+      assert.deepEqual(
+        lp2.imageUrls,
+        ["https://img.pickax.com/user-35295/graphic.jpeg"],
+        "metadata/ link preview excluded from post images"
+      );
+      assert.ok(lp2.linkCard, "link card imported");
+      assert.equal(lp2.linkCard!.domain, "trendingpoliticsnews.com");
+      assert.equal(
+        lp2.linkCard!.title,
+        "Rural Alaskans Push Back On Murkowski’s SAVE America Act Warning"
+      );
+      console.log("ok  paste-source: link card below the real post image");
+
+      // DOM fallback: no usable payload -> link card still extracted from
+      // the DOM, metadata image still excluded from post images.
+      const noPayloadHtml = LINK_HTML.replace(
+        /<script id="__NUXT_DATA__"[^]*?<\/script>/,
+        '<script id="__NUXT_DATA__" type="application/json">[]</script>'
+      );
+      const lp3 = parsePostHtml(noPayloadHtml);
+      assert.deepEqual(
+        lp3.imageUrls,
+        ["https://img.pickax.com/user-35295/graphic.jpeg"],
+        "DOM fallback excludes the metadata/ preview from post images"
+      );
+      assert.ok(lp3.linkCard, "link card from DOM fallback");
+      assert.equal(lp3.linkCard!.domain, "trendingpoliticsnews.com");
+      assert.equal(
+        lp3.linkCard!.imageUrl,
+        "https://img.pickax.com/metadata/abc123.jpeg"
+      );
+      console.log("ok  DOM fallback: link card extraction");
+
+      // Bookmarklet v7 end-to-end on the same page.
+      const ldom = new JSDOM(LINK_HTML, {
+        url: "https://pickax.com/post/710273",
+      });
+      let navigated = "";
+      const fakeLocation = {
+        pathname: "/post/710273",
+        get href() {
+          return "https://pickax.com/post/710273";
+        },
+        set href(v: string) {
+          navigated = v;
+        },
+      };
+      const body = BOOKMARKLET.replace(/^javascript:/, "");
+      const fn = new (ldom.window as any).Function("document", "location", body);
+      fn(ldom.window.document, fakeLocation);
+      const bpayload = JSON.parse(
+        decodeURIComponent(navigated.split("#import=")[1])
+      );
+      assert.equal(bpayload.v, 7, "bookmarklet v7");
+      assert.deepEqual(
+        bpayload.images,
+        ["https://img.pickax.com/user-35295/graphic.jpeg"],
+        "bookmarklet: attachments only, no link preview image"
+      );
+      assert.ok(bpayload.linkCard, "bookmarklet carries the link card");
+      assert.equal(bpayload.linkCard.domain, "trendingpoliticsnews.com");
+      // App side: the hash round-trip keeps the link card.
+      (globalThis as any).window = {
+        location: { hash: "#import=" + encodeURIComponent(JSON.stringify(bpayload)) },
+        history: { replaceState: () => {} },
+      };
+      const back2 = parseImportHash();
+      delete (globalThis as any).window;
+      assert.ok(back2?.linkCard, "link card survives the hash round-trip");
+      assert.equal(back2!.linkCard!.domain, "trendingpoliticsnews.com");
+      console.log("ok  bookmarklet v7: link card end-to-end");
+
+      // Renderer: the link card draws its image box, domain, and title
+      // below the post images.
+      const linkCanvas: any = await renderPostImage({
+        postId: "710273",
+        displayName: "Diamond and Silk",
+        username: "DiamondandSilk",
+        verified: null,
+        avatar: null,
+        text: "Residents are pushing back.",
+        timestamp: "",
+        images: [],
+        engagement: {},
+        linkCard: {
+          url: "https://trendingpoliticsnews.com/rural-alaskans-push-back/",
+          domain: "trendingpoliticsnews.com",
+          title: "Rural Alaskans Push Back On Murkowski’s SAVE America Act Warning",
+          description: "",
+          image: null,
+        },
+      });
+      const linkTexts = linkCanvas._ctx.calls
+        .filter((c: any) => c[0] === "fillText")
+        .map((c: any) => c[1]);
+      assert.ok(
+        linkTexts.some((t: string) => t === "trendingpoliticsnews.com"),
+        "domain drawn"
+      );
+      assert.ok(
+        linkTexts.some((t: string) => t.includes("Rural Alaskans Push Back")),
+        "title drawn"
+      );
+      console.log("ok  renderer: link card draws domain + title");
+    }
+
     // Legacy v1 bookmarklets sent verified:true — still honored as gold.
     {
       const legacy = {
@@ -698,7 +891,7 @@ async function main() {
       const lpayload = JSON.parse(
         decodeURIComponent(lnavigated.split("#import=")[1])
       );
-      assert.equal(lpayload.v, 6, "bookmarklet v6");
+      assert.equal(lpayload.v, 7, "bookmarklet v7");
       assert.ok(
         lpayload.avatar.includes("img.pickax.com/user-8356"),
         `author avatar, not viewer's (got ${lpayload.avatar})`
@@ -708,7 +901,7 @@ async function main() {
         ["https://img.pickax.com/post-1234/abcd.jpeg"],
         "viewer avatar not among post images"
       );
-      console.log("ok  bookmarklet on logged-in page (v6)");
+      console.log("ok  bookmarklet on logged-in page (v7)");
     }
   }
 

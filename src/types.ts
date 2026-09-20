@@ -37,6 +37,21 @@ export interface PostVideo {
   thumbnail: LoadedImage | null;
 }
 
+// A shared-website link card, as pickax.com renders it below the post
+// images: the link's preview image, the bare domain, and the link title.
+export interface PostLinkCard {
+  /** The full shared URL. */
+  url: string;
+  /** Bare domain, e.g. "trendingpoliticsnews.com". */
+  domain: string;
+  /** The link's title. */
+  title: string;
+  /** The link's description, when available. */
+  description: string;
+  /** The link's preview image (already loaded), or null when it failed. */
+  image: LoadedImage | null;
+}
+
 // A quoted (reposted) post embedded inside a quote post, as pickax.com
 // shows it: the quoted author's own header (avatar, name, badge,
 // timestamp) and their full text, inside the darker inner card.
@@ -67,6 +82,8 @@ export interface PostData {
   images: LoadedImage[];
   engagement: Engagement;
   video?: PostVideo | null;
+  /** The shared-website link card; null/undefined when the post shares none. */
+  linkCard?: PostLinkCard | null;
   /** Set when the post quotes another post; null/undefined otherwise. */
   quoted?: QuotedPost | null;
 }

@@ -80,7 +80,7 @@ assert.equal(typeof extractPost, "function", "content.js exposes extractPost");
 
 const o = extractPost();
 assert.ok(o, "extractPost returned a payload");
-assert.equal(o.v, 5);
+assert.equal(o.v, 6);
 assert.equal(o.postId, "709927");
 assert.equal(o.displayName, "Will Carlton");
 assert.equal(o.username, "whatifiamright");
@@ -165,5 +165,90 @@ console.log("ok  content.js extraction (quote post, badges, no-image rule)");
     "viewer avatars excluded from post images"
   );
   console.log("ok  content.js on logged-in page (avatar + images)");
+}
+
+// Post with attachments + a shared link: attachments are the authoritative
+// post images (the link card's metadata/ preview image must NOT leak into
+// them), and the link card is extracted with its domain + title.
+{
+  const nuxt3 = JSON.stringify([
+    { post: 1 },
+    {
+      id: 710274,
+      content: 2,
+      user: 3,
+      attachments: 4,
+      link: 6,
+    },
+    "Residents push back.<br>Second line.",
+    {
+      fullname: "Diamond and Silk",
+      username: "DiamondandSilk",
+      avatar: "user-35295/ds.jpeg",
+    },
+    [{ url: "user-35295/graphic.jpeg", type: "image" }], // 4
+    null, // 5 (unused)
+    {
+      // 6: link card
+      url: "https://trendingpoliticsnews.com/rural-alaskans/?utm_source=DS21",
+      image: "https://img.pickax.com/metadata/abc123.jpeg",
+      title: "Rural Alaskans Push Back On Murkowski\u2019s Warning",
+      inputUrl: "https://trendingpoliticsnews.com/rural-alaskans/?utm_source=DS21",
+      description: "Some description.",
+    },
+  ]);
+  const html3 = `<!DOCTYPE html><html><head>
+<meta property="og:title" content="Diamond and Silk posted">
+<meta property="og:url" content="https://pickax.com/post/710274">
+</head><body>
+<div><a href="/DiamondandSilk"><img src="https://img.pickax.com/user-35295/ds.jpeg" class="rounded-full"></a></div>
+<div><a href="/DiamondandSilk">@DiamondandSilk</a></div>
+<img src="https://img.pickax.com/user-35295/graphic.jpeg" alt="post image">
+<div class="font-light text-sm bg-dark3/70 rounded-lg relative p-3 mt-4" title="Rural Alaskans Push Back On Murkowski\u2019s Warning">
+<a href="https://trendingpoliticsnews.com/rural-alaskans/?utm_source=DS21" target="_blank" class="mb-1 flex">
+<img src="https://img.pickax.com/metadata/abc123.jpeg" alt="link preview" class="rounded-t-lg w-full aspect-video object-cover">
+</a>
+<div class="p-2 flex flex-col gap-1">
+<a href="https://trendingpoliticsnews.com/rural-alaskans/?utm_source=DS21" target="_blank" class="flex text-[12px] text-light2 hover:underline">trendingpoliticsnews.com</a>
+<a href="https://trendingpoliticsnews.com/rural-alaskans/?utm_source=DS21" target="_blank" class="flex text-[15px] hover:underline">Rural Alaskans Push Back On Murkowski\u2019s Warning</a>
+</div>
+</div>
+<script id="__NUXT_DATA__" type="application/json">${nuxt3}</script>
+</body></html>`;
+  const dom3 = new JSDOM(html3, { url: "https://pickax.com/post/710274" });
+  delete globalThis.__pickaxPostToImageInjected; // allow re-eval in the test harness
+  const factory3 = new dom3.window.Function(
+    "document",
+    "location",
+    src + "\nreturn globalThis.__pickaxExtractPost;"
+  );
+  const extract3 = factory3(dom3.window.document, dom3.window.location);
+  const o3 = extract3();
+  assert.equal(o3.postId, "710274");
+  assert.deepEqual(
+    o3.imageUrls,
+    ["https://img.pickax.com/user-35295/graphic.jpeg"],
+    "attachments only: the metadata/ link preview is not a post image"
+  );
+  assert.ok(o3.linkCard, "link card extracted");
+  assert.equal(
+    o3.linkCard.url,
+    "https://trendingpoliticsnews.com/rural-alaskans/?utm_source=DS21"
+  );
+  assert.equal(o3.linkCard.domain, "trendingpoliticsnews.com");
+  assert.equal(
+    o3.linkCard.title,
+    "Rural Alaskans Push Back On Murkowski\u2019s Warning"
+  );
+  assert.equal(
+    o3.linkCard.imageUrl,
+    "https://img.pickax.com/metadata/abc123.jpeg"
+  );
+  // The payload must survive the app's hash round-trip (field names matter).
+  assert.ok(
+    appSrc.includes("linkCard"),
+    "app accepts the extension's linkCard field"
+  );
+  console.log("ok  content.js extracts the link card (attachments vs link image)");
 }
 console.log("\nALL EXTENSION TESTS PASSED");

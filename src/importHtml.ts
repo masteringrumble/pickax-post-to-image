@@ -23,6 +23,19 @@ export interface ParsedQuotedPost {
   timestamp: string;
 }
 
+export interface ParsedLinkCard {
+  /** The full shared URL. */
+  url: string;
+  /** The link's title, as Pickax shows it under the preview image. */
+  title: string;
+  /** Bare domain, e.g. "trendingpoliticsnews.com". */
+  domain: string;
+  /** The link's preview image (img.pickax.com/metadata/...). */
+  imageUrl: string;
+  /** The link's description, when available. */
+  description: string;
+}
+
 export interface ParsedImport {
   postId: string;
   displayName: string;
@@ -44,6 +57,12 @@ export interface ParsedImport {
   views: string;
   /** The quoted post, or null when this is not a quote post. */
   quoted: ParsedQuotedPost | null;
+  /**
+   * The shared-website link card, or null when the post shares no link.
+   * Rendered below the post images, exactly like pickax.com: preview
+   * image, domain, title.
+   */
+  linkCard: ParsedLinkCard | null;
 }
 
 const APP_URL = "https://masteringrumble.github.io/pickax-post-to-image/";
@@ -145,6 +164,8 @@ function extractAvatarUrl(doc: Document, username: string): string {
 // avatar (post author, logged-in viewer, commenters) — never a post image —
 // so all of them are excluded, not just the author's. On logged-in pages
 // the viewer's nav/comment-box avatars used to leak in as post images.
+// Link-card preview images (img.pickax.com/metadata/...) are excluded too:
+// they belong to the link card, not the post's own attached images.
 function extractImageUrls(doc: Document, avatarUrl: string): string[] {
   const imgs = Array.from(doc.querySelectorAll('img[src*="img.pickax.com"]'));
   const urls: string[] = [];
@@ -152,10 +173,54 @@ function extractImageUrls(doc: Document, avatarUrl: string): string[] {
     if (img.classList.contains("rounded-full")) continue;
     const src = img.getAttribute("src")?.trim() ?? "";
     if (!src || src === avatarUrl || src.includes("favicon")) continue;
+    if (src.includes("/metadata/")) continue;
     if (!urls.includes(src)) urls.push(src);
     if (urls.length >= 4) break;
   }
   return urls;
+}
+
+/**
+ * The shared-website link card, DOM fallback (the payload's post.link is
+ * preferred). Pickax renders it as a div[title="<link title>"] wrapping an
+ * <a href="<full URL>"> around the preview image
+ * (img.pickax.com/metadata/...), followed by a small domain link and the
+ * title link.
+ */
+export function extractLinkCard(doc: Document): ParsedLinkCard | null {
+  const divs = Array.from(doc.querySelectorAll("div[title]"));
+  for (const div of divs) {
+    const img = div.querySelector('img[src*="img.pickax.com/metadata/"]');
+    if (!img) continue;
+    const anchors = Array.from(
+      div.querySelectorAll('a[href^="http"]')
+    ) as HTMLAnchorElement[];
+    if (anchors.length === 0) continue;
+    const url = (anchors[0].getAttribute("href") ?? "").trim();
+    if (!url) continue;
+    const titleAttr = (div.getAttribute("title") ?? "").trim();
+    let title = titleAttr;
+    let domain = "";
+    let longest = "";
+    for (const a of anchors) {
+      const t = (a.textContent ?? "").trim();
+      if (!t) continue;
+      if (/^[a-z0-9.-]+\.[a-z]{2,}$/i.test(t) && !/\s/.test(t)) domain = domain || t;
+      if (t.length > longest.length) longest = t;
+    }
+    if (!title) title = longest;
+    if (!domain) {
+      try {
+        domain = new URL(url).hostname.replace(/^www\./i, "");
+      } catch {
+        domain = "";
+      }
+    }
+    const imageUrl = (img.getAttribute("src") ?? "").trim();
+    if (!imageUrl) continue;
+    return { url, title, domain, imageUrl, description: "" };
+  }
+  return null;
 }
 
 function extractViews(doc: Document): string {
@@ -317,10 +382,14 @@ export function parsePostHtml(html: string): ParsedImport {
     avatarUrl,
     text,
     timestamp: extractTimestamp(doc),
+    // The payload's attachments list is the authoritative source for the
+    // post's own attached images: it never includes the link card's preview
+    // image (img.pickax.com/metadata/...), which the DOM scrape used to
+    // mistake for a post image. DOM scraping is only the fallback.
     // On quote posts there are no post images: the quoted card shows only
     // the quoted author's avatar + text, and the DOM's other images belong
     // to the quoted post. This keeps all three import paths identical.
-    imageUrls: nuxt?.quoted ? [] : extractImageUrls(doc, avatarUrl),
+    imageUrls: nuxt?.quoted ? [] : nuxt ? nuxt.images : extractImageUrls(doc, avatarUrl),
     videoSrc: video.src,
     videoTitle: video.title,
     videoThumbnailUrl: video.thumbnailUrl,
@@ -328,6 +397,18 @@ export function parsePostHtml(html: string): ParsedImport {
     axes: extractAxes(doc),
     views: extractViews(doc),
     quoted,
+    // The shared-website link card: payload's post.link when present,
+    // DOM fallback otherwise. Rendered below the post images, as on
+    // pickax.com.
+    linkCard: nuxt?.linkCard
+      ? {
+          url: nuxt.linkCard.url,
+          title: nuxt.linkCard.title,
+          domain: nuxt.linkCard.domain,
+          imageUrl: nuxt.linkCard.imageUrl,
+          description: nuxt.linkCard.description,
+        }
+      : extractLinkCard(doc),
   };
 }
 
@@ -386,6 +467,28 @@ function coerceImport(raw: unknown): ParsedImport | null {
         timestamp: str(q.timestamp),
       }
     : null;
+  // The shared-website link card (v7+ bookmarklets / extension).
+  const lc = o.linkCard && typeof o.linkCard === "object"
+    ? (o.linkCard as Record<string, unknown>)
+    : null;
+  const linkCard: ParsedLinkCard | null =
+    lc && (str(lc.url) || str(lc.title))
+      ? {
+          url: str(lc.url),
+          title: str(lc.title),
+          domain:
+            str(lc.domain) ||
+            (() => {
+              try {
+                return new URL(str(lc.url)).hostname.replace(/^www\./i, "");
+              } catch {
+                return "";
+              }
+            })(),
+          imageUrl: str(lc.imageUrl) || str(lc.image),
+          description: str(lc.description),
+        }
+      : null;
   const parsed: ParsedImport = {
     postId: str(o.postId),
     displayName: str(o.displayName),
@@ -410,6 +513,7 @@ function coerceImport(raw: unknown): ParsedImport | null {
     axes: str(o.axes),
     views: str(o.views),
     quoted,
+    linkCard,
   };
   if (!parsed.displayName && !parsed.text && !parsed.username) return null;
   return parsed;
@@ -445,9 +549,9 @@ export const BOOKMARKLET: string =
   "var d=document," +
   "q=function(s){return d.querySelector(s)}," +
   "meta=function(p){var e=q('meta[property=\"'+p+'\"]');return e?e.getAttribute('content')||'':''}," +
-  "o={v:6,postId:'',displayName:(meta('og:title')||'').replace(/\\s+posted\\s*$/i,'')," +
+  "o={v:7,postId:'',displayName:(meta('og:title')||'').replace(/\\s+posted\\s*$/i,'')," +
   "text:(meta('og:description')||'').replace(/\\s*user=\\S+\\s+[\\d,]+\\s+Followers\\s*$/i,'')," +
-  "username:'',verified:'',avatar:'',timestamp:'',picks:'',axes:'',views:'',videoSrc:'',videoTitle:'',videoThumb:'',images:[],q:null};" +
+  "username:'',verified:'',avatar:'',timestamp:'',picks:'',axes:'',views:'',videoSrc:'',videoTitle:'',videoThumb:'',images:[],linkCard:null,q:null};" +
   "Array.prototype.forEach.call(d.querySelectorAll('a[href^=\"/\"]'),function(a){" +
   "var t=(a.textContent||'').trim();" +
   "if(t.charAt(0)==='@'&&t.length>1){" +
@@ -486,8 +590,11 @@ export const BOOKMARKLET: string =
   "if(thm)o.videoThumb=thm[0];" +
   // Every rounded-full image is an avatar (author, viewer, commenters) —
   // never a post image — so all are excluded, not just the author's.
+  // Link card preview images (img.pickax.com/metadata/...) are excluded
+  // too: they belong to the link card, not the post's own attached images.
   "o.images=Array.prototype.filter.call(d.querySelectorAll('img[src*=\"img.pickax.com\"]')," +
-  "function(i){return i!==av&&!(i.classList&&i.classList.contains('rounded-full'));" +
+  "function(i){var s=i.src||'';" +
+  "return i!==av&&!(i.classList&&i.classList.contains('rounded-full'))&&s.indexOf('/metadata/')===-1;" +
   "}).map(function(i){return i.src;}).slice(0,4);" +
   "var pm=location.pathname.match(/\\/post\\/(\\d+)/);if(pm)o.postId=pm[1];" +
   // Full post body from the page payload (og:description is truncated).
@@ -522,6 +629,19 @@ export const BOOKMARKLET: string =
   "if(u.username)o.username=String(u.username).replace(/^@+/,'');" +
   "if(u.avatar)o.avatar='https://img.pickax.com/'+u.avatar;" +
   "o.verified=u.creator?'gold':(u.is_verified?'blue':o.verified);" +
+  // The payload's attachments are the authoritative post images: they never
+  // include the link card's preview image (metadata/...), which the DOM
+  // scrape used to mistake for a post image.
+  "var at2=tgt.attachments;" +
+  "if(at2&&at2.length){var im2=[],ai2;for(ai2=0;ai2<at2.length&&im2.length<4;ai2++){var w2=at2[ai2];" +
+  "if(w2&&w2.type==='image'&&w2.url)im2.push('https://img.pickax.com/'+w2.url);}" +
+  "if(im2.length)o.images=im2;}" +
+  // The shared-website link card (post.link): preview image, domain, title.
+  // Generic — works for any website the post shares.
+  "var lk2=tgt.link;" +
+  "if(lk2&&(lk2.url||lk2.title)){var lcu=lk2.url||lk2.inputUrl||'',lch='';" +
+  "try{lch=new URL(lcu).hostname.replace(/^www\\./i,'');}catch(e){}" +
+  "o.linkCard={url:lcu,title:lk2.title||'',domain:lch,imageUrl:lk2.image||'',description:lk2.description||''};}" +
   "var rp=tgt.repostOf;" +
   "if(rp&&typeof rp.content==='string'){var qu=rp.user||{};" +
   "o.q={postId:String(rp.id||''),displayName:qu.fullname||''," +
@@ -530,6 +650,23 @@ export const BOOKMARKLET: string =
   "verified:qu.creator?'gold':(qu.is_verified?'blue':'')," +
   "text:dvC(rp.content),timestamp:dvT(rp.createdAt||'')};}}}" +
   "}catch(e){}}" +
+  // Link card DOM fallback (only when the payload didn't provide one):
+  // div[title] wrapping an http anchor around a metadata/ preview image.
+  "if(!o.linkCard){" +
+  "Array.prototype.forEach.call(d.querySelectorAll('div[title]'),function(cd){" +
+  "if(o.linkCard)return;" +
+  "var mi=cd.querySelector('img[src*=\"img.pickax.com/metadata/\"]');" +
+  "if(!mi||!mi.src)return;" +
+  "var as=cd.querySelectorAll('a[href^=\"http\"]');" +
+  "if(!as.length)return;" +
+  "var u2=(as[0].getAttribute('href')||'').trim();if(!u2)return;" +
+  "var ti=(cd.getAttribute('title')||'').trim(),dm='',lg='';" +
+  "Array.prototype.forEach.call(as,function(a){var t=(a.textContent||'').trim();" +
+  "if(/^[a-z0-9.-]+\\.[a-z]{2,}$/i.test(t)&&t.indexOf(' ')===-1&&!dm)dm=t;" +
+  "if(t.length>lg.length)lg=t;});" +
+  "if(!ti)ti=lg;" +
+  "if(!dm){try{dm=new URL(u2).hostname.replace(/^www\\./i,'');}catch(e){}}" +
+  "o.linkCard={url:u2,title:ti,domain:dm,imageUrl:mi.src,description:''};});}" +
   // On quote posts there are no post images: the quoted card shows only
   // the quoted author's avatar + text, and the DOM's other images belong
   // to the quoted post. Same rule as the worker and paste-source paths.

@@ -527,6 +527,38 @@ export async function renderPostImage(
   const video = o.showMedia ? data.video : null;
   const videoH = video ? Math.round((CONTENT_W * 9) / 16) : 0;
 
+  // ---- shared-website link card -------------------------------------------
+  // pickax.com renders it below the post images: the link's preview image
+  // (aspect-video, cover), then the bare domain and the link title.
+  const linkCard = o.showMedia ? (data.linkCard ?? null) : null;
+  const LINK_PAD = 32; // card p-3 at our scale
+  const LINK_TEXT_PAD = 21; // the inner p-2 around domain + title
+  const LINK_RADIUS = 32;
+  const LINK_IMG_TEXT_GAP = 32; // mb-1 + p-2 top at our scale
+  const LINK_TITLE_GAP = 11; // gap-1 at our scale
+  const LINK_DOMAIN_H = 44; // 32px domain line
+  const linkTextW = CONTENT_W - (LINK_PAD + LINK_TEXT_PAD) * 2;
+  let linkH = 0;
+  let linkImgH = 0;
+  let linkTitleLines: string[] = [];
+  if (linkCard && (linkCard.title || linkCard.domain || linkCard.image)) {
+    measure.font = bodyFont(40);
+    linkTitleLines = linkCard.title
+      ? wrapText(linkCard.title, linkTextW, (t) => measure.measureText(t).width)
+      : [];
+    linkImgH = linkCard.image
+      ? Math.round(((CONTENT_W - LINK_PAD * 2) * 9) / 16)
+      : 0;
+    linkH =
+      LINK_PAD +
+      linkImgH +
+      (linkImgH > 0 ? LINK_IMG_TEXT_GAP : 0) +
+      (linkCard.domain ? LINK_DOMAIN_H : 0) +
+      (linkCard.domain && linkTitleLines.length > 0 ? LINK_TITLE_GAP : 0) +
+      linkTitleLines.length * TEXT_LH +
+      LINK_PAD;
+  }
+
   const engagementH = showEngagementRow ? BTN_H : 0;
   const FOOTER_TAIL = 56; // divider -> source line
 
@@ -534,6 +566,7 @@ export async function renderPostImage(
   if (lines.length > 0) cardH += GAP_HEADER_TEXT + textH;
   if (quotedH > 0) cardH += GAP_SECTION + quotedH;
   if (imagesH > 0) cardH += GAP_SECTION + imagesH;
+  if (linkH > 0) cardH += GAP_SECTION + linkH;
   if (videoH > 0) cardH += GAP_SECTION + videoH;
   if (engagementH > 0) cardH += GAP_SECTION + engagementH;
   cardH += GAP_SECTION + FOOTER_TAIL + CARD_PAD;
@@ -806,6 +839,58 @@ export async function renderPostImage(
       y += row.height + gap;
     }
     y -= gap;
+  }
+
+  // ---- link card: preview image, domain, title — as pickax.com shows it --
+  if (linkH > 0 && linkCard) {
+    y += GAP_SECTION;
+    roundRectPath(ctx, cx0, y, CONTENT_W, linkH, LINK_RADIUS);
+    ctx.fillStyle = PX.quoteCard;
+    ctx.fill();
+    ctx.strokeStyle = PX.quoteBorder;
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    let ly = y + LINK_PAD;
+    const lx = cx0 + LINK_PAD;
+    const lw = CONTENT_W - LINK_PAD * 2;
+    if (linkCard.image && linkImgH > 0) {
+      const im = linkCard.image;
+      // Cover-fit the 16:9 box, clipped to rounded corners.
+      const s = Math.max(lw / im.width, linkImgH / im.height);
+      const dw = im.width * s;
+      const dh = im.height * s;
+      ctx.save();
+      roundRectPath(ctx, lx, ly, lw, linkImgH, 24);
+      ctx.clip();
+      ctx.drawImage(
+        im.img,
+        lx + (lw - dw) / 2,
+        ly + (linkImgH - dh) / 2,
+        dw,
+        dh
+      );
+      ctx.restore();
+      ly += linkImgH + LINK_IMG_TEXT_GAP;
+    }
+    const ltx = lx + LINK_TEXT_PAD;
+    if (linkCard.domain) {
+      ctx.fillStyle = PX.muted;
+      ctx.font = font(32);
+      ctx.textAlign = "left";
+      ctx.fillText(truncate(ctx, linkCard.domain, linkTextW), ltx, ly + 36);
+      ly += LINK_DOMAIN_H;
+      if (linkTitleLines.length > 0) ly += LINK_TITLE_GAP;
+    }
+    if (linkTitleLines.length > 0) {
+      ctx.fillStyle = PX.white;
+      ctx.font = bodyFont(40);
+      for (const line of linkTitleLines) {
+        ctx.fillText(line, ltx, ly);
+        ly += TEXT_LH;
+      }
+    }
+    y += linkH;
   }
 
   // ---- video embed: thumbnail as shown on the actual post, with a play -----

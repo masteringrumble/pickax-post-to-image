@@ -98,6 +98,19 @@ export interface WorkerQuotedPost {
   timestamp: string | null;
 }
 
+export interface WorkerLinkCard {
+  /** The full shared URL. */
+  url: string;
+  /** The link's title, as Pickax shows it under the preview image. */
+  title: string;
+  /** Bare domain, e.g. "trendingpoliticsnews.com". */
+  domain: string;
+  /** The link's preview image (img.pickax.com/metadata/...). */
+  imageUrl: string;
+  /** The link's description, when the payload carries one. */
+  description: string;
+}
+
 export interface PostPayload {
   postId: string;
   postUrl: string;
@@ -119,6 +132,11 @@ export interface PostPayload {
   verified: "gold" | "blue" | null;
   images: string[];
   video: { src: string; title: string; thumbnail: string | null } | null;
+  /**
+   * The shared-website link card, or null when the post shares no link.
+   * Rendered below the post images, exactly like pickax.com.
+   */
+  linkCard: WorkerLinkCard | null;
   /** The quoted post, or null when this is not a quote post. */
   quoted: WorkerQuotedPost | null;
   fetchedAt: string;
@@ -147,7 +165,34 @@ function extractEngagement(html: string): { picks: string | null; axes: string |
   return { picks, axes };
 }
 
-/** Video embeds (e.g. Rumble) render as iframes; capture src + title. */
+/**
+ * The shared-website link card, DOM fallback (the payload's post.link is
+ * preferred). Pickax renders it as a div[title="<link title>"] wrapping an
+ * <a href="<full URL>"> around the preview image
+ * (img.pickax.com/metadata/...), followed by a small domain link and the
+ * title link.
+ */
+function extractLinkCardDOM(html: string): WorkerLinkCard | null {
+  const m = html.match(
+    /<div[^>]*title="([^"]{1,200})"[^>]*>[\s\S]{0,600}?<a[^>]*href="(https?:\/\/[^"]+)"[^>]*>[\s\S]{0,400}?<img[^>]*src="(https:\/\/img\.pickax\.com\/metadata\/[^"']+)"[^>]*>/i
+  );
+  if (!m || !m.index) return null;
+  const url = decodeEntities(m[2]);
+  const imageUrl = decodeEntities(m[3]);
+  const tail = html.slice(m.index + m[0].length, m.index + m[0].length + 2000);
+  const domM = tail.match(/text-\[12px\][^>]*>([^<>]{1,80})</i);
+  const titleM = tail.match(/text-\[15px\][^>]*>([^<>]{1,200})</i);
+  const title = decodeEntities(titleM ? titleM[1].trim() : m[1].trim());
+  let domain = domM ? decodeEntities(domM[1].trim()) : "";
+  if (!domain) {
+    try {
+      domain = new URL(url).hostname.replace(/^www\./i, "");
+    } catch {
+      domain = "";
+    }
+  }
+  return { url, title, domain, imageUrl, description: "" };
+}
 function extractVideo(html: string): { src: string; title: string; thumbnail: string | null } | null {
   const tagM = html.match(/<iframe([^>]*)>/i);
   if (!tagM) return null;
@@ -238,20 +283,44 @@ export function extract(html: string, postId: string, postUrl: string): PostPayl
     }
   }
 
-  // Attached post images: every img.pickax.com image except the avatar.
+  // Attached post images: the payload's attachments list is the
+  // authoritative source — it never includes the link card's preview image
+  // (img.pickax.com/metadata/...), which the DOM scrape used to mistake
+  // for a post image. DOM scraping below is only the fallback.
   // On quote posts there are no post images at all: the quoted card shows
   // only the quoted author's avatar + text, and every other image on the
   // page (the quoted author's avatar, the quoted post's attached images)
   // belongs to the quoted post, not the outer post.
   const images: string[] = [];
   if (!nuxt?.quoted) {
-    const imgRe =
-      /<img[^>]*src=["'](https:\/\/img\.pickax\.com\/[^"']+)["'][^>]*>/gi;
-    let im: RegExpExecArray | null;
-    while ((im = imgRe.exec(html)) !== null) {
-      if (im[1] !== avatarUrl && !images.includes(im[1])) images.push(im[1]);
+    if (nuxt) {
+      images.push(...nuxt.images);
+    } else {
+      const imgRe =
+        /<img[^>]*src=["'](https:\/\/img\.pickax\.com\/[^"']+)["'][^>]*>/gi;
+      let im: RegExpExecArray | null;
+      while ((im = imgRe.exec(html)) !== null) {
+        if (
+          im[1] !== avatarUrl &&
+          !im[1].includes("/metadata/") &&
+          !images.includes(im[1])
+        )
+          images.push(im[1]);
+      }
     }
   }
+
+  // The shared-website link card: payload's post.link when present, DOM
+  // fallback otherwise. Generic — works for any website the post shares.
+  const linkCard: WorkerLinkCard | null = nuxt?.linkCard
+    ? {
+        url: nuxt.linkCard.url,
+        title: nuxt.linkCard.title,
+        domain: nuxt.linkCard.domain,
+        imageUrl: nuxt.linkCard.imageUrl,
+        description: nuxt.linkCard.description,
+      }
+    : extractLinkCardDOM(html);
 
   const viewsMatch = html.match(/aria-label="Post views:\s*([\d,]+)"/i);
 
@@ -303,6 +372,7 @@ export function extract(html: string, postId: string, postUrl: string): PostPayl
     verified,
     images,
     video,
+    linkCard,
     quoted,
     fetchedAt: new Date().toISOString(),
   };

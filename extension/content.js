@@ -107,7 +107,7 @@
     }
 
     var o = {
-      v: 5,
+      v: 6,
       postId: "",
       displayName: (meta("og:title") || "").replace(/\s+posted\s*$/i, ""),
       text: (meta("og:description") || "").replace(
@@ -125,6 +125,7 @@
       videoTitle: "",
       videoThumb: "",
       imageUrls: [],
+      linkCard: null,
       q: null,
     };
 
@@ -204,11 +205,16 @@
 
     // Every rounded-full image is an avatar (author, viewer, commenters) —
     // never a post image — so all are excluded, not just the author's.
+    // Link card preview images (img.pickax.com/metadata/...) are excluded
+    // too: they belong to the link card, not the post's own attached images.
     o.imageUrls = Array.prototype.filter.call(
       d.querySelectorAll('img[src*="img.pickax.com"]'),
       function (img) {
+        var s = img.src || "";
         return (
-          img !== av && !(img.classList && img.classList.contains("rounded-full"))
+          img !== av &&
+          !(img.classList && img.classList.contains("rounded-full")) &&
+          s.indexOf("/metadata/") === -1
         );
       }
     )
@@ -216,6 +222,47 @@
         return img.src;
       })
       .slice(0, 4);
+
+    // Link card DOM fallback (only when the payload didn't provide one):
+    // div[title] wrapping an http anchor around a metadata/ preview image.
+    function extractLinkCardDOM() {
+      var divs = d.querySelectorAll("div[title]"),
+        found = null;
+      Array.prototype.forEach.call(divs, function (cd) {
+        if (found) return;
+        var mi = cd.querySelector('img[src*="img.pickax.com/metadata/"]');
+        if (!mi || !mi.src) return;
+        var as = cd.querySelectorAll('a[href^="http"]');
+        if (!as.length) return;
+        var u2 = (as[0].getAttribute("href") || "").trim();
+        if (!u2) return;
+        var ti = (cd.getAttribute("title") || "").trim(),
+          dm = "",
+          lg = "";
+        Array.prototype.forEach.call(as, function (a) {
+          var t = (a.textContent || "").trim();
+          if (/^[a-z0-9.-]+\.[a-z]{2,}$/i.test(t) && t.indexOf(" ") === -1 && !dm)
+            dm = t;
+          if (t.length > lg.length) lg = t;
+        });
+        if (!ti) ti = lg;
+        if (!dm) {
+          try {
+            dm = new URL(u2).hostname.replace(/^www\./i, "");
+          } catch (e) {
+            /* keep empty */
+          }
+        }
+        found = {
+          url: u2,
+          title: ti,
+          domain: dm,
+          imageUrl: mi.src,
+          description: "",
+        };
+      });
+      return found;
+    }
 
     var pm = location.pathname.match(/\/post\/(\d+)/);
     if (pm) o.postId = pm[1];
@@ -256,6 +303,37 @@
               : u.is_verified
                 ? "blue"
                 : o.verified;
+            // The payload's attachments are the authoritative post images:
+            // they never include the link card's preview image (metadata/...).
+            var at2 = tgt.attachments;
+            if (at2 && at2.length) {
+              var im2 = [];
+              for (var ai2 = 0; ai2 < at2.length && im2.length < 4; ai2++) {
+                var w2 = at2[ai2];
+                if (w2 && w2.type === "image" && w2.url)
+                  im2.push("https://img.pickax.com/" + w2.url);
+              }
+              if (im2.length) o.imageUrls = im2;
+            }
+            // The shared-website link card (post.link): preview image,
+            // domain, title. Generic — works for any website the post shares.
+            var lk2 = tgt.link;
+            if (lk2 && (lk2.url || lk2.title)) {
+              var lcu = lk2.url || lk2.inputUrl || "",
+                lch = "";
+              try {
+                lch = new URL(lcu).hostname.replace(/^www\./i, "");
+              } catch (e) {
+                /* keep empty */
+              }
+              o.linkCard = {
+                url: lcu,
+                title: lk2.title || "",
+                domain: lch,
+                imageUrl: lk2.image || "",
+                description: lk2.description || "",
+              };
+            }
             var rp = tgt.repostOf;
             if (rp && typeof rp.content === "string") {
               var qu = rp.user || {};
@@ -286,6 +364,9 @@
     // the quoted author's avatar + text, and the DOM's other images belong
     // to the quoted post. Same rule as the worker and paste-source paths.
     if (o.q) o.imageUrls = [];
+
+    // Link card DOM fallback when the payload didn't carry post.link.
+    if (!o.linkCard) o.linkCard = extractLinkCardDOM();
 
     return o;
   }
