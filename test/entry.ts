@@ -704,6 +704,68 @@ async function main() {
     console.log("ok  quote post payload parsing (by id, both badges, avatars)");
   }
 
+  // ---- quote posts: no post images on any import path ---------------------
+  // A quote post's rendered card shows only the two profile pictures. The
+  // DOM also carries the quoted author's avatar and the quoted post's
+  // attached images, but those must never leak into the outer images —
+  // identically for paste-source, worker, and bookmarklet imports.
+  {
+    const fixture = JSON.stringify([
+      { post: 1 }, // 0: root
+      {
+        // 1: outer post (quote)
+        id: 709927,
+        content: 2,
+        createdAt: "2026-09-20T00:06:01.373Z",
+        user: 3,
+        repostOf: 5,
+      },
+      "Outer quote text", // 2
+      {
+        // 3: quoter
+        fullname: "Will Carlton",
+        username: "whatifiamright",
+        avatar: "user-2846/pic.jpeg",
+        is_verified: true,
+        creator: 4,
+      },
+      { id: 9 }, // 4: creator record -> gold
+      {
+        // 5: quoted post
+        id: 708186,
+        content: "Quoted text",
+        createdAt: "2026-09-19T21:36:00.195Z",
+        user: 6,
+      },
+      {
+        // 6: quoted author
+        fullname: "hannah partridge",
+        username: "Utopicfox",
+        avatar: "user-78430/pic.png",
+        is_verified: true,
+        creator: null,
+      },
+    ]);
+    const html =
+      `<html><head><meta property="og:url" content="https://pickax.com/post/709927">` +
+      `<script id="__NUXT_DATA__" type="application/json">` +
+      fixture +
+      `</script></head><body>` +
+      // Quoter's avatar, quoted author's avatar, quoted post's attached image.
+      `<img class="rounded-full" src="https://img.pickax.com/user-2846/pic.jpeg">` +
+      `<img class="rounded-full" src="https://img.pickax.com/user-78430/pic.png">` +
+      `<img src="https://img.pickax.com/post-708186/attached.jpeg">` +
+      `</body></html>`;
+    const p = parsePostHtml(html);
+    assert.ok(p.quoted, "quote detected");
+    assert.deepEqual(
+      p.imageUrls,
+      [],
+      "quoted post images never leak into the outer images (paste-source)"
+    );
+    console.log("ok  quote posts have no post images (paste-source path)");
+  }
+
   // ---- quote posts: renderer draws the inner card -------------------------
   {
     const quotedAvatar = { width: 100, height: 100 } as any;

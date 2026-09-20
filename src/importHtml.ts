@@ -301,7 +301,10 @@ export function parsePostHtml(html: string): ParsedImport {
     avatarUrl,
     text,
     timestamp: extractTimestamp(doc),
-    imageUrls: extractImageUrls(doc, avatarUrl),
+    // On quote posts there are no post images: the quoted card shows only
+    // the quoted author's avatar + text, and the DOM's other images belong
+    // to the quoted post. This keeps all three import paths identical.
+    imageUrls: nuxt?.quoted ? [] : extractImageUrls(doc, avatarUrl),
     videoSrc: video.src,
     videoTitle: video.title,
     videoThumbnailUrl: video.thumbnailUrl,
@@ -492,5 +495,9 @@ export const BOOKMARKLET: string =
   "verified:qu.creator?'gold':(qu.is_verified?'blue':'')," +
   "text:dvC(rp.content),timestamp:dvT(rp.createdAt||'')};}}}" +
   "}catch(e){}}" +
+  // On quote posts there are no post images: the quoted card shows only
+  // the quoted author's avatar + text, and the DOM's other images belong
+  // to the quoted post. Same rule as the worker and paste-source paths.
+  "if(o.q)o.images=[];" +
   "location.href='" + APP_URL + "#import='+encodeURIComponent(JSON.stringify(o));" +
   "})()";

@@ -238,12 +238,19 @@ export function extract(html: string, postId: string, postUrl: string): PostPayl
     }
   }
 
-  // Attached post images: every img.pickax.com image except the avatar
+  // Attached post images: every img.pickax.com image except the avatar.
+  // On quote posts there are no post images at all: the quoted card shows
+  // only the quoted author's avatar + text, and every other image on the
+  // page (the quoted author's avatar, the quoted post's attached images)
+  // belongs to the quoted post, not the outer post.
   const images: string[] = [];
-  const imgRe = /<img[^>]*src=["'](https:\/\/img\.pickax\.com\/[^"']+)["'][^>]*>/gi;
-  let im: RegExpExecArray | null;
-  while ((im = imgRe.exec(html)) !== null) {
-    if (im[1] !== avatarUrl && !images.includes(im[1])) images.push(im[1]);
+  if (!nuxt?.quoted) {
+    const imgRe =
+      /<img[^>]*src=["'](https:\/\/img\.pickax\.com\/[^"']+)["'][^>]*>/gi;
+    let im: RegExpExecArray | null;
+    while ((im = imgRe.exec(html)) !== null) {
+      if (im[1] !== avatarUrl && !images.includes(im[1])) images.push(im[1]);
+    }
   }
 
   const viewsMatch = html.match(/aria-label="Post views:\s*([\d,]+)"/i);
