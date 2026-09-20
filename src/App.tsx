@@ -18,6 +18,12 @@ import {
 } from "./importHtml";
 import { renderPostImage } from "./renderer";
 import {
+  InstagramIcon,
+  SnapchatIcon,
+  TruthSocialIcon,
+  XIcon,
+} from "./brandIcons";
+import {
   canNativeShareFile,
   canvasToPngFile,
   copyText,
@@ -543,8 +549,8 @@ export default function App() {
     return canvasToPngFile(canvas, `pickax-post-${postId || "image"}.png`);
   }
 
-  function openInNewTab(url: string) {
-    window.open(url, "_blank", "noopener,noreferrer");
+  function openInNewTab(url: string): Window | null {
+    return window.open(url, "_blank", "noopener,noreferrer");
   }
 
   // Post targets prefill a suggested caption the user can edit before
@@ -561,23 +567,19 @@ export default function App() {
   async function handleShareX() {
     const data = dataRef.current;
     if (!data || sharing) return;
+    const caption = suggestedPostCaption(data);
+    // Open the composer tab synchronously inside the click gesture so popup
+    // blockers never swallow it — the standard share-button behavior.
+    const tab = openInNewTab(xIntentUrl(caption));
     setSharing(true);
     try {
-      const caption = suggestedPostCaption(data);
       const file = await getShareFile();
-      if (file && canNativeShareFile(file)) {
-        // Mobile: the OS sheet hands the image + caption straight to the X app.
-        // A dismissed sheet leaves the user alone; a failed one falls through
-        // to the manual path below.
-        const outcome = await tryNativeShare({ files: [file], title: "Pickax post", text: caption });
-        if (outcome !== "failed") return;
-      }
-      // Desktop: download the image, copy the caption, open the X composer.
       if (file) downloadPng(file, file.name);
       await copyText(caption);
-      openInNewTab(xIntentUrl(caption));
       showToast(
-        "Image downloaded and caption copied — attach the image in the X composer."
+        tab
+          ? "X composer opened in a new tab — attach the downloaded image to your post."
+          : "Pop-up blocked — image downloaded and caption copied, paste them into a new X post."
       );
     } finally {
       setSharing(false);
@@ -587,24 +589,18 @@ export default function App() {
   async function handleShareTruthSocial() {
     const data = dataRef.current;
     if (!data || sharing) return;
+    const url = postUrlOf(data);
+    const title = truthSocialTitle(data);
+    const tab = openInNewTab(truthSocialShareUrl(title, url));
     setSharing(true);
     try {
-      const url = postUrlOf(data);
-      const title = truthSocialTitle(data);
       const file = await getShareFile();
-      if (file && canNativeShareFile(file)) {
-        const outcome = await tryNativeShare({
-          files: [file],
-          title: "Pickax post",
-          text: url ? `${title}\n${url}` : title,
-        });
-        if (outcome !== "failed") return;
-      }
       if (file) downloadPng(file, file.name);
       await copyText(url ? `${title}\n${url}` : title);
-      openInNewTab(truthSocialShareUrl(title, url));
       showToast(
-        "Image downloaded and caption copied — attach the image in the Truth Social composer."
+        tab
+          ? "Truth Social composer opened in a new tab — attach the downloaded image to your post."
+          : "Pop-up blocked — image downloaded and caption copied, paste them into a new Truth Social post."
       );
     } finally {
       setSharing(false);
@@ -1040,6 +1036,7 @@ export default function App() {
                   onClick={handleShareX}
                   disabled={sharing}
                 >
+                  <XIcon />
                   Post to X
                 </button>
                 <button
@@ -1047,6 +1044,7 @@ export default function App() {
                   onClick={handleShareTruthSocial}
                   disabled={sharing}
                 >
+                  <TruthSocialIcon />
                   Post to Truth&nbsp;Social
                 </button>
                 <button
@@ -1054,6 +1052,7 @@ export default function App() {
                   onClick={() => handleShareStory("Instagram")}
                   disabled={sharing}
                 >
+                  <InstagramIcon />
                   Instagram Story
                 </button>
                 <button
@@ -1061,6 +1060,7 @@ export default function App() {
                   onClick={() => handleShareStory("Snapchat")}
                   disabled={sharing}
                 >
+                  <SnapchatIcon />
                   Snapchat Story
                 </button>
               </div>
