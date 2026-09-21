@@ -47,11 +47,21 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Mulish:wght@400;600;700&family=Poppins:wght@400;600;700&display=swap" rel="stylesheet" />
+    <style>
+      /* ShareThis sticky bar docks to the bottom of the screen on mobile
+         (<=1024px) — lift the Buy Me a Coffee button above it so the two
+         never overlap. Desktop is unaffected (bar is on the left, BMC right). */
+      @media (max-width: 1024px) {
+        #bmc-wbtn { bottom: 84px !important; }
+      }
+    </style>
   </head>
   <body>
     <div id="root"></div>
     <script type="module" src="./src/main.tsx"></script>
     <!-- Buy Me a Coffee floating widget -->
     <script data-name="BMC-Widget" data-cfasync="false" src="https://cdnjs.buymeacoffee.com/1.0.0/widget.prod.min.js" data-id="masteringrumble" data-description="Support me on Buy me a coffee!" data-message="" data-color="#3eb1f9" data-position="Right" data-x_margin="18" data-y_margin="18"></script>
+    <!-- ShareThis Smart Share Buttons (left side, #3eb1f9, 5 channels) -->
+    <script type='text/javascript' src='https://platform-api.sharethis.com/js/sharethis.js#property=6ab11bda4a0270b6dfa564c0&product=inline-share-buttons' async='async'></script>
   </body>
 </html>
