@@ -291,18 +291,73 @@
     if (!o.picks && engBtns.length > 0) o.picks = engagementCount(engBtns[0]);
     if (!o.axes && engBtns.length > 1) o.axes = engagementCount(engBtns[1]);
 
-    var fr = q('iframe[src*="rumble.com/embed"]');
-    if (fr) {
-      o.videoSrc = fr.src || "";
-      o.videoTitle = fr.getAttribute("title") || "";
-    }
+    // Video extraction (backup path): mirrors the worker's classifyIframe so
+    // every video post type the site handles works here too — Rumble,
+    // YouTube, native uploads, Spotify, and Apple Podcasts embeds.
     var htmlForThumb = isPage
       ? document.documentElement.innerHTML
       : d.innerHTML || "";
-    var thm = htmlForThumb.match(
-      /https:\/\/[a-z0-9.-]+\.cdn\.rumble\.cloud\/[^"\\\s'<>]+\.(?:jpg|jpeg|png|webp)/i
-    );
-    if (thm) o.videoThumb = thm[0];
+    function pageThumb(re) {
+      var m = htmlForThumb.match(re);
+      return m ? (m[1] || m[0]).replace(/\\\//g, "/") : "";
+    }
+    var cands = [];
+    Array.prototype.forEach.call(qa("iframe"), function (fr) {
+      var src = fr.src || "";
+      var title = fr.getAttribute("title") || "";
+      var m = null;
+      var kind = "";
+      var thumb = "";
+      if (/rumble\.com\/embed\//i.test(src)) {
+        kind = "rumble";
+        thumb =
+          pageThumb(
+            /https:\/\/(?:[a-z0-9.-]+\.cdn\.rumble\.cloud|1a-1791\.com)\/[^"\\\s'<>]+\.(?:jpg|jpeg|png|webp)/i
+          ) || pageThumb(/"thumbnail_url"\s*:\s*"([^"]+)"/);
+      } else if (
+        (m = src.match(/youtube(?:-nocookie)?\.com\/embed\/([A-Za-z0-9_-]{6,})/i))
+      ) {
+        kind = "youtube";
+        thumb = "https://i.ytimg.com/vi/" + m[1] + "/hqdefault.jpg";
+      } else if (
+        (m = src.match(
+          /open\.spotify\.com\/embed\/(?:track|album|artist|episode|playlist)\/([A-Za-z0-9]+)/i
+        ))
+      ) {
+        kind = "spotify";
+        // No oEmbed fetch in the backup path, so match both of Spotify's
+        // artwork hosts (the worker also checks spotifycdn.com; i.scdn.co
+        // is where the embed's own artwork loads from).
+        thumb = pageThumb(
+          /https:\/\/(?:[a-z0-9.-]*spotifycdn\.com|i\.scdn\.co)\/[^"\\\s'<>]+/i
+        );
+      } else if (
+        (m = src.match(/embed\.podcasts\.apple\.com\/[^"'\s]*?\/id(\d+)/i))
+      ) {
+        kind = "apple";
+        thumb = pageThumb(/https:\/\/is\d-ssl\.mzstatic\.com\/[^"\\\s'<>]+/i);
+      }
+      if (kind) cands.push({ src: src, title: title, thumb: thumb });
+    });
+    // Native video uploads: a <video> tag with a poster (the img.pickax.com
+    // preview the post shows before play).
+    var nv = q("video[poster]");
+    if (nv) {
+      cands.push({
+        src: nv.getAttribute("src") || nv.getAttribute("poster") || "",
+        title: "",
+        thumb: nv.getAttribute("poster") || "",
+      });
+    }
+    // Prefer a candidate with a thumbnail; document order breaks ties.
+    cands.sort(function (a, b) {
+      return (b.thumb ? 1 : 0) - (a.thumb ? 1 : 0);
+    });
+    if (cands.length > 0) {
+      o.videoSrc = cands[0].src;
+      o.videoTitle = cands[0].title;
+      o.videoThumb = cands[0].thumb;
+    }
 
     // Every rounded-full image is an avatar (author, viewer, commenters) —
     // never a post image — so all are excluded, not just the author's.
