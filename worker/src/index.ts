@@ -197,17 +197,27 @@ function extractLinkCardDOM(html: string): WorkerLinkCard | null {
   return { url, title, domain, imageUrl, description: "" };
 }
 function extractVideo(html: string): { src: string; title: string; thumbnail: string | null } | null {
-  const tagM = html.match(/<iframe([^>]*)>/i);
-  if (!tagM) return null;
-  const attrs = tagM[1];
-  const srcM = attrs.match(/src=["']([^"']+)["']/i);
-  const titleM = attrs.match(/title=["']([^"']*)["']/i);
-  if (!srcM || !/rumble\.com\/embed\//i.test(srcM[1])) return null;
-  return {
-    src: srcM[1],
-    title: titleM ? decodeEntities(titleM[1]) : "",
-    thumbnail: extractVideoThumbnail(html),
-  };
+  // Pickax ships the oEmbed <iframe> as an escaped string inside the
+  // __NUXT_DATA__ payload (\u003Ciframe src=\"https://rumble.com/embed/…\"),
+  // so unescape payload sequences before looking for the tag. Older markup
+  // had a literal <iframe> in the HTML, which this also still matches.
+  const unescaped = html
+    .replace(/\\u003[cC]/g, "<")
+    .replace(/\\u003[eE]/g, ">")
+    .replace(/\\"/g, '"')
+    .replace(/\\\//g, "/");
+  const tags = unescaped.match(/<iframe([^>]*)>/gi) ?? [];
+  for (const tag of tags) {
+    const srcM = tag.match(/src=["']([^"']+)["']/i);
+    if (!srcM || !/rumble\.com\/embed\//i.test(srcM[1])) continue;
+    const titleM = tag.match(/title=["']([^"']*)["']/i);
+    return {
+      src: srcM[1],
+      title: titleM ? decodeEntities(titleM[1]) : "",
+      thumbnail: extractVideoThumbnail(html),
+    };
+  }
+  return null;
 }
 
 /**
