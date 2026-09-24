@@ -440,27 +440,18 @@ kbd {
   background: var(--panel-2);
 }
 
-/* Browser extension promo: always visible below the tool panel. */
-.extension-promo {
-  margin-top: 28px;
-  background: var(--panel);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: 24px 28px;
-  text-align: center;
-  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.35);
-}
-
-.extension-promo .fast-title {
-  margin-top: 0;
-}
-
-.extension-promo .btn {
+/* Extension buttons inside the panel: links styled as buttons. */
+.ext-btn {
   text-decoration: none;
 }
 
-.extension-promo .btn-row {
-  justify-content: center;
+/* Compact extension hint on the manual-entry stage. */
+.ext-hint {
+  margin: 0 0 4px;
+}
+
+.ext-hint a {
+  color: var(--accent);
 }
 
 .footer {

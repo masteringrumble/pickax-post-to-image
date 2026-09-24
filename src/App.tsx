@@ -8,12 +8,9 @@ import {
   type WorkerPostPayload,
 } from "./api";
 import {
-  BOOKMARKLET,
   clearImportHash,
   parseImportHash,
-  parsePostHtml,
   prettyTimestamp,
-  ImportParseError,
   type ParsedImport,
 } from "./importHtml";
 import { renderPostImage } from "./renderer";
@@ -206,9 +203,6 @@ export default function App() {
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [busy, setBusy] = useState(false);
-  // Collapsed "more ways" section on the URL stage: the page opens showing
-  // only the link box; bookmarklet + paste-source appear on tap.
-  const [showMoreWays, setShowMoreWays] = useState(false);
 
   // manual-entry fields
   const [displayName, setDisplayName] = useState("");
@@ -232,7 +226,6 @@ export default function App() {
   // The post currently shown in the preview stage; drives which toggles are
   // offered (e.g. "Site embed" only appears when the post has a link card).
   const [previewData, setPreviewData] = useState<PostData | null>(null);
-  const [htmlSource, setHtmlSource] = useState("");
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const dataRef = useRef<PostData | null>(null);
 
@@ -266,7 +259,6 @@ export default function App() {
     setImageUrlList([]);
     setPreviewUrl("");
     setOptions(DEFAULT_RENDER_OPTIONS);
-    setHtmlSource("");
     canvasRef.current = null;
     dataRef.current = null;
     setPreviewData(null);
@@ -400,24 +392,6 @@ export default function App() {
     }
   }
 
-  async function handleImportFromHtml() {
-    setError("");
-    setNotice("");
-    if (!htmlSource.trim()) {
-      setError(
-        "Paste the page source first — open the post, press Ctrl+U (Mac: Cmd+Option+U), copy everything, and paste it here."
-      );
-      return;
-    }
-    try {
-      const parsed = parsePostHtml(htmlSource);
-      await importParsed(parsed, false);
-    } catch (e) {
-      if (e instanceof ImportParseError) setError(e.message);
-      else setError("Something went wrong while reading the page source. Please try again.");
-    }
-  }
-
   // Primary flow: paste a post URL, the import service reads the public post
   // page, and the image is built from what Pickax actually shows. No typing.
   async function handleGenerateFromUrl() {
@@ -440,7 +414,7 @@ export default function App() {
       // of making the user type everything. State the limitation plainly.
       setNotice(
         workerErrorMessage(e) +
-          " Instead of typing everything, use the one-click bookmarklet or paste the page source below — or enter the post details exactly as they appear on Pickax and we'll build the image from what you provide. Nothing is invented or filled in."
+          " The browser extension skips all of this — one click on the post builds the image, no typing needed. Or enter the post details exactly as they appear on Pickax and we'll build the image from what you provide. Nothing is invented or filled in."
       );
       setStage("manual");
     }
@@ -608,55 +582,33 @@ export default function App() {
               )}
             </p>
 
-            <button
-              type="button"
-              className="more-ways"
-              aria-expanded={showMoreWays}
-              onClick={() => setShowMoreWays((v) => !v)}
-            >
-              {showMoreWays ? "Fewer ways ▴" : "More ways ▾"}
-            </button>
+            <div className="divider" aria-hidden="true">
+              <span>the faster way</span>
+            </div>
 
-            {showMoreWays && (
-              <>
-                <div className="divider" aria-hidden="true">
-                  <span>other ways in</span>
-                </div>
-
-                <h2 className="fast-title">One-click import</h2>
-                <p className="muted small">
-                  Drag this button to your bookmarks bar. Then, while viewing any
-                  Pickax post, click it — the post opens here with everything
-                  filled in.
-                </p>
-                <a
-                  className="btn primary bookmarklet"
-                  href={BOOKMARKLET}
-                  onClick={(e) => e.preventDefault()}
-                  title="Drag me to your bookmarks bar"
-                >
-                  📥 Pickax → Image
-                </a>
-
-                <h2 className="fast-title">Or paste the page source</h2>
-                <p className="muted small">
-                  Open the post in your browser, press{" "}
-                  <kbd>Ctrl</kbd>+<kbd>U</kbd> (Mac: <kbd>⌘</kbd>+<kbd>⌥</kbd>+
-                  <kbd>U</kbd>), copy everything, and paste it below:
-                </p>
-                <textarea
-                  className="text-input textarea mono"
-                  rows={4}
-                  value={htmlSource}
-                  onChange={(e) => setHtmlSource(e.target.value)}
-                  placeholder="Paste the full page source here…"
-                  spellCheck={false}
-                />
-                <button className="btn" onClick={handleImportFromHtml}>
-                  Import from page source
-                </button>
-              </>
-            )}
+            <h2 className="fast-title">Get the browser extension</h2>
+            <p className="muted small">
+              One click on any Pickax post turns it into an image — no need to
+              visit this site at all.
+            </p>
+            <div className="btn-row">
+              <a
+                className="btn primary ext-btn"
+                href={CHROME_STORE_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                Get it for Chrome
+              </a>
+              <a
+                className="btn ext-btn"
+                href={FIREFOX_STORE_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                Get it for Firefox
+              </a>
+            </div>
           </section>
         )}
 
@@ -671,6 +623,17 @@ export default function App() {
           <section className="panel">
             {notice && <p className="notice">{notice}</p>}
             {error && <p className="error">{error}</p>}
+            <p className="hint ext-hint">
+              Skip the typing —{" "}
+              <a href={CHROME_STORE_URL} target="_blank" rel="noopener noreferrer">
+                get the Chrome extension
+              </a>{" "}
+              or{" "}
+              <a href={FIREFOX_STORE_URL} target="_blank" rel="noopener noreferrer">
+                the Firefox one
+              </a>
+              .
+            </p>
 
             <div className="grid-2">
               <div>
@@ -915,31 +878,6 @@ export default function App() {
             </div>
           </section>
         )}
-        <section className="extension-promo" aria-label="Browser extension">
-          <h2 className="fast-title">Prefer one click?</h2>
-          <p className="muted small">
-            The browser extension turns any Pickax post into an image right
-            from the post itself — no need to visit this site.
-          </p>
-          <div className="btn-row center">
-            <a
-              className="btn primary"
-              href={CHROME_STORE_URL}
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              Get it for Chrome
-            </a>
-            <a
-              className="btn"
-              href={FIREFOX_STORE_URL}
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              Get it for Firefox
-            </a>
-          </div>
-        </section>
       </main>
       <footer className="footer">
         <span>Free tool for the Pickax community</span>
