@@ -9,7 +9,13 @@
 // extension's offscreen document (which has a real DOM, canvas, and
 // document.fonts, exactly what the renderer needs).
 import { renderPostImage } from "../../src/renderer";
-import { WORKER_BASE } from "../../src/api";
+import {
+  WORKER_BASE,
+  fetchPostFromWorker,
+  workerConfigured,
+  type WorkerPostPayload,
+  type WorkerQuotedPost,
+} from "../../src/api";
 import {
   DEFAULT_RENDER_OPTIONS,
   type RenderOptions,
@@ -17,6 +23,7 @@ import {
 import type {
   LoadedImage,
   PostData,
+  QuotedPost,
   VerifiedBadge,
 } from "../../src/types";
 
@@ -109,6 +116,133 @@ function loadCdnImageCached(url: string): Promise<HTMLImageElement | null> {
 export async function prepareRenderData(
   p: ExtractedPayload
 ): Promise<PostData> {
+  // The website's primary path reads the post through the worker's
+  // server-side extraction — that is what reliably gets video thumbnails,
+  // post images, avatars, and link cards. Do exactly the same here: the
+  // content script already extracted the post id, so ask the worker for
+  // the identical payload the site would get. The DOM payload stays as
+  // the fallback for posts the worker can't see (private/deleted) or
+  // when the worker is unreachable.
+  if (p.postId && workerConfigured()) {
+    try {
+      const wp = await fetchWorkerPayloadCached(p.postId);
+      return await prepareFromWorkerPayload(wp);
+    } catch {
+      /* fall through to the DOM payload */
+    }
+  }
+  return prepareFromDomPayload(p);
+}
+
+// Cache worker payloads per post id so toggle flips (which re-run
+// prepareRenderData) don't refetch. A rejected fetch is evicted so the
+// next call retries instead of sticking to the DOM fallback forever.
+const workerPayloadCache = new Map<string, Promise<WorkerPostPayload>>();
+function fetchWorkerPayloadCached(postId: string): Promise<WorkerPostPayload> {
+  let hit = workerPayloadCache.get(postId);
+  if (!hit) {
+    hit = fetchPostFromWorker(postId);
+    workerPayloadCache.set(postId, hit);
+    hit.catch(() => {
+      if (workerPayloadCache.get(postId) === hit)
+        workerPayloadCache.delete(postId);
+    });
+  }
+  return hit;
+}
+
+/**
+ * The quoted post (quote posts only): each level's avatar loads
+ * recursively — the same walk the web app does, so nested quote chains
+ * render identically.
+ */
+async function loadQuotedFromWorker(
+  q: WorkerQuotedPost | null | undefined
+): Promise<QuotedPost | null> {
+  if (!q) return null;
+  let avatar: HTMLImageElement | null = null;
+  if (q.avatarUrl) {
+    avatar = await loadCdnImageCached(q.avatarUrl);
+  }
+  return {
+    postId: q.postId,
+    displayName: q.displayName ?? "",
+    username: (q.username ?? "").replace(/^@+/, ""),
+    verified: q.verified ?? null,
+    avatar,
+    text: (q.text ?? "").replace(/\\r\\n/g, "\n"),
+    timestamp: q.timestamp ?? "",
+    quoted: await loadQuotedFromWorker(q.quoted),
+  };
+}
+
+/**
+ * Turn a worker payload into renderer data, loading remote images —
+ * the same conversion the web app applies to the same payload, so the
+ * extension renders exactly what the site would.
+ */
+async function prepareFromWorkerPayload(
+  wp: WorkerPostPayload
+): Promise<PostData> {
+  let avatar: HTMLImageElement | null = null;
+  if (wp.avatarUrl) {
+    avatar = await loadCdnImageCached(wp.avatarUrl);
+  }
+
+  const images: LoadedImage[] = [];
+  for (const u of (wp.images ?? []).slice(0, MAX_POST_IMAGES)) {
+    const loaded = await loadCdnImageCached(u);
+    if (loaded) images.push(toLoaded(loaded));
+  }
+
+  let videoThumb: LoadedImage | null = null;
+  if (wp.video?.thumbnail) {
+    const loaded = await loadCdnImageCached(wp.video.thumbnail);
+    if (loaded) videoThumb = toLoaded(loaded);
+  }
+
+  let linkImage: LoadedImage | null = null;
+  if (wp.linkCard?.imageUrl) {
+    const loaded = await loadCdnImageCached(wp.linkCard.imageUrl);
+    if (loaded) linkImage = toLoaded(loaded);
+  }
+
+  const quoted = await loadQuotedFromWorker(wp.quoted);
+
+  return {
+    postId: wp.postId,
+    displayName: wp.displayName ?? "",
+    username: (wp.username ?? "").replace(/^@+/, ""),
+    verified: wp.verified ?? null,
+    avatar,
+    text: (wp.text ?? "").replace(/\\r\\n/g, "\n"),
+    timestamp: wp.timeAgo || wp.timestamp || "",
+    images,
+    engagement: {
+      picks: wp.picks ?? undefined,
+      axes: wp.axes ?? undefined,
+      views: wp.views ?? undefined,
+    },
+    video: wp.video
+      ? { src: wp.video.src, title: wp.video.title, thumbnail: videoThumb }
+      : null,
+    linkCard: wp.linkCard
+      ? {
+          url: wp.linkCard.url,
+          domain: wp.linkCard.domain,
+          title: wp.linkCard.title,
+          description: wp.linkCard.description ?? "",
+          image: linkImage,
+        }
+      : null,
+    quoted,
+  };
+}
+
+/** Turn a DOM-extraction payload into renderer data (fallback path). */
+async function prepareFromDomPayload(
+  p: ExtractedPayload
+): Promise<PostData> {
   let avatar: HTMLImageElement | null = null;
   if (p.avatarUrl) {
     avatar = await loadCdnImageCached(p.avatarUrl);
@@ -176,6 +310,8 @@ export async function prepareRenderData(
           avatar: quotedAvatar,
           text: (p.q.text ?? "").replace(/\\r\\n/g, "\n"),
           timestamp: p.q.timestamp ?? "",
+          // The DOM payload only ever carries one quote level.
+          quoted: null,
         }
       : null,
   };

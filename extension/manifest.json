@@ -7,6 +7,11 @@
   },
   "browser_specific_settings": {
     "gecko": {
+      "data_collection_permissions": {
+        "required": [
+          "none"
+        ]
+      },
       "id": "pickax-post-to-image@masteringrumble.github.io",
       "strict_min_version": "121.0"
     }
@@ -41,5 +46,5 @@
     "offscreen",
     "downloads"
   ],
-  "version": "1.9.0"
+  "version": "1.9.1"
 }

@@ -23,6 +23,13 @@ into posts — no buttons, no page changes — and the website never opens.
 - The extracted post data is rendered locally in your browser (a hidden
   document on Chromium, a hidden tab on Firefox) into a PNG saved to your
   downloads.
+- **Reading the post:** to render exactly what the website would, the
+  extension fetches the public post's data through our own first-party
+  service at
+  `https://pickax-post-api.masteringrumble.workers.dev`
+  (run by the same developer; the service sees the post URL and **stores
+  nothing**). If the service can't read the post, the extension falls back
+  to the data it extracted on your device.
 - **Post images and avatars:** some images on Pickax don't allow other
   sites to load them directly, so the extension fetches those through our
   own image proxy at
@@ -31,7 +38,7 @@ into posts — no buttons, no page changes — and the website never opens.
   while fetching it and **stores nothing** — no logs of your activity, no
   copies of the images.
 - **Nothing is stored** by the extension — no local storage, no cookies,
-  no servers beyond the image proxy above, no third parties.
+  no servers beyond the first-party service above, no third parties.
 
 ## Permissions used
 
