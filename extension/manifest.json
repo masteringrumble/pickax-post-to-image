@@ -28,7 +28,7 @@
       "run_at": "document_idle"
     }
   ],
-  "description": "Turn any Pickax post into a clean, shareable image — right from the post, no website visit needed.",
+  "description": "Turn any Pickax post into a clean, shareable image \u2014 right from the post, no website visit needed.",
   "host_permissions": [
     "https://pickax.com/*",
     "https://www.pickax.com/*"
@@ -46,5 +46,5 @@
     "offscreen",
     "downloads"
   ],
-  "version": "1.9.1"
+  "version": "1.9.2"
 }
