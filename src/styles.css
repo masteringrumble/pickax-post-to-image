@@ -440,20 +440,6 @@ kbd {
   background: var(--panel-2);
 }
 
-/* Extension buttons inside the panel: links styled as buttons. */
-.ext-btn {
-  text-decoration: none;
-}
-
-/* Compact extension hint on the manual-entry stage. */
-.ext-hint {
-  margin: 0 0 4px;
-}
-
-.ext-hint a {
-  color: var(--accent);
-}
-
 .footer {
   margin-top: 28px;
   color: var(--muted);
