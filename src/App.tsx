@@ -601,7 +601,7 @@ export default function App() {
                 Get it for Chrome
               </a>
               <a
-                className="btn ext-btn"
+                className="btn primary ext-btn"
                 href={FIREFOX_STORE_URL}
                 target="_blank"
                 rel="noopener noreferrer"
