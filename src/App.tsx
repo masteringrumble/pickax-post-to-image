@@ -32,6 +32,12 @@ type Stage = "url" | "loading" | "manual" | "preview";
 
 const MAX_POST_IMAGES = 4;
 
+// Browser extension store listings (both live as of 2026-09-24).
+const CHROME_STORE_URL =
+  "https://chromewebstore.google.com/detail/pickax-post-to-image/ailpedkkcffcdjkimccmhgimfefgdppl";
+const FIREFOX_STORE_URL =
+  "https://addons.mozilla.org/en-US/firefox/addon/pickax-post-to-image/";
+
 function loadImageFromFile(file: File): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
     const url = URL.createObjectURL(file);
@@ -909,6 +915,31 @@ export default function App() {
             </div>
           </section>
         )}
+        <section className="extension-promo" aria-label="Browser extension">
+          <h2 className="fast-title">Prefer one click?</h2>
+          <p className="muted small">
+            The browser extension turns any Pickax post into an image right
+            from the post itself — no need to visit this site.
+          </p>
+          <div className="btn-row center">
+            <a
+              className="btn primary"
+              href={CHROME_STORE_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              Get it for Chrome
+            </a>
+            <a
+              className="btn"
+              href={FIREFOX_STORE_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              Get it for Firefox
+            </a>
+          </div>
+        </section>
       </main>
       <footer className="footer">
         <span>Free tool for the Pickax community</span>
