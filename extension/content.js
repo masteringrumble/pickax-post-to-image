@@ -321,8 +321,7 @@
     )
       .map(function (img) {
         return img.src;
-      })
-      .slice(0, 4);
+      });
 
     // Link card DOM fallback (only when the payload didn't provide one):
     // div[title] wrapping an http anchor around a metadata/ preview image.

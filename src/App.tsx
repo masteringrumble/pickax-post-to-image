@@ -30,8 +30,6 @@ import "./styles.css";
 
 type Stage = "url" | "loading" | "manual" | "preview";
 
-const MAX_POST_IMAGES = 4;
-
 function loadImageFromFile(file: File): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
     const url = URL.createObjectURL(file);
@@ -124,7 +122,7 @@ async function postDataFromWorker(
 
   const images: LoadedImage[] = [];
   let imageFailed = false;
-  for (const u of (p.images ?? []).slice(0, MAX_POST_IMAGES)) {
+  for (const u of (p.images ?? [])) {
     try {
       images.push(toLoaded(await loadCdnImage(u)));
     } catch {
@@ -313,7 +311,7 @@ export default function App() {
 
     const images: LoadedImage[] = [];
     let imageFailed = false;
-    for (const u of p.imageUrls.slice(0, MAX_POST_IMAGES)) {
+    for (const u of p.imageUrls) {
       try {
         images.push(toLoaded(await loadCdnImage(u)));
       } catch {
@@ -471,14 +469,14 @@ export default function App() {
 
       const images: LoadedImage[] = [];
       let imageFailed = false;
-      for (const f of imageFiles.slice(0, MAX_POST_IMAGES)) {
+      for (const f of imageFiles) {
         try {
           images.push(toLoaded(await loadImageFromFile(f)));
         } catch {
           imageFailed = true;
         }
       }
-      for (const u of imageUrlList.slice(0, MAX_POST_IMAGES - images.length)) {
+      for (const u of imageUrlList) {
         try {
           images.push(toLoaded(await loadCdnImage(u)));
         } catch {
@@ -543,7 +541,7 @@ export default function App() {
       return;
     }
     setError("");
-    setImageUrlList((l) => [...l, u].slice(0, MAX_POST_IMAGES));
+    setImageUrlList((l) => [...l, u]);
     setImageUrl("");
   }
 
@@ -801,7 +799,7 @@ export default function App() {
             </div>
 
             <label className="field-label" htmlFor="post-images">
-              Post images <span className="optional">(optional, up to {MAX_POST_IMAGES})</span>
+              Post images <span className="optional">(optional)</span>
             </label>
             <input
               id="post-images"
@@ -810,7 +808,7 @@ export default function App() {
               accept="image/*"
               multiple
               onChange={(e) =>
-                setImageFiles(Array.from(e.target.files ?? []).slice(0, MAX_POST_IMAGES))
+                setImageFiles(Array.from(e.target.files ?? []))
               }
             />
             <div className="url-row">

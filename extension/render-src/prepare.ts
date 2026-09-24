@@ -62,8 +62,6 @@ export interface ExtractedPayload {
   } | null;
 }
 
-const MAX_POST_IMAGES = 4;
-
 function loadImageFromUrl(url: string): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
     const img = new Image();
@@ -190,7 +188,7 @@ async function prepareFromWorkerPayload(
   }
 
   const images: LoadedImage[] = [];
-  for (const u of (wp.images ?? []).slice(0, MAX_POST_IMAGES)) {
+  for (const u of (wp.images ?? [])) {
     const loaded = await loadCdnImageCached(u);
     if (loaded) images.push(toLoaded(loaded));
   }
@@ -249,7 +247,7 @@ async function prepareFromDomPayload(
   }
 
   const images: LoadedImage[] = [];
-  for (const u of (p.imageUrls ?? []).slice(0, MAX_POST_IMAGES)) {
+  for (const u of (p.imageUrls ?? [])) {
     const loaded = await loadCdnImageCached(u);
     if (loaded) images.push(toLoaded(loaded));
   }

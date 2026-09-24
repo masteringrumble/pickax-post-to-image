@@ -157,7 +157,7 @@ interface ImageRow {
 }
 
 function layoutImages(images: LoadedImage[]): ImageRow[] {
-  const list = images.slice(0, 4); // keep the layout simple
+  const list = images; // all post images, however many Pickax allows
   if (list.length === 0) return [];
   const gap = 16;
   const rows: ImageRow[] = [];

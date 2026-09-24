@@ -457,8 +457,7 @@ function coerceImport(raw: unknown): ParsedImport | null {
       ? o.images
       : [];
   const imageUrls = rawImages
-    .filter((u): u is string => typeof u === "string")
-    .slice(0, 4);
+    .filter((u): u is string => typeof u === "string"); // all images, however many Pickax allows
   // v5 bookmarklets send the quoted post as `q`; older ones send nothing.
   // v8+ sends nested quotes as `q.q` (quote-of-a-quote chains).
   const q = o.q && typeof o.q === "object" ? (o.q as Record<string, unknown>) : null;
@@ -615,7 +614,7 @@ export const BOOKMARKLET: string =
   "o.images=Array.prototype.filter.call(d.querySelectorAll('img[src*=\"img.pickax.com\"]')," +
   "function(i){var s=i.src||'';" +
   "return i!==av&&!(i.classList&&i.classList.contains('rounded-full'))&&s.indexOf('/metadata/')===-1;" +
-  "}).map(function(i){return i.src;}).slice(0,4);" +
+  "}).map(function(i){return i.src;});" +
   "var pm=location.pathname.match(/\\/post\\/(\\d+)/);if(pm)o.postId=pm[1];" +
   // Full post body from the page payload (og:description is truncated).
   // Compact devalue resolver: the payload is a flat array, and integers in
