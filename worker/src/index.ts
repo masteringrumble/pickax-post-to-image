@@ -209,12 +209,24 @@ function extractVideo(html: string): { src: string; title: string; thumbnail: st
   const tags = unescaped.match(/<iframe([^>]*)>/gi) ?? [];
   for (const tag of tags) {
     const srcM = tag.match(/src=["']([^"']+)["']/i);
-    if (!srcM || !/rumble\.com\/embed\//i.test(srcM[1])) continue;
+    if (!srcM) continue;
+    const src = srcM[1];
+    const isRumble = /rumble\.com\/embed\//i.test(src);
+    // YouTube oEmbed: https://www.youtube.com/embed/<videoId>?feature=oembed
+    const ytM = src.match(
+      /youtube(?:-nocookie)?\.com\/embed\/([A-Za-z0-9_-]{6,})/i
+    );
+    if (!isRumble && !ytM) continue;
     const titleM = tag.match(/title=["']([^"']*)["']/i);
+    // YouTube always has a thumbnail at i.ytimg.com for the video id
+    // (hqdefault exists for every video; maxresdefault does not).
+    const thumbnail = ytM
+      ? `https://i.ytimg.com/vi/${ytM[1]}/hqdefault.jpg`
+      : extractVideoThumbnail(html);
     return {
-      src: srcM[1],
+      src,
       title: titleM ? decodeEntities(titleM[1]) : "",
-      thumbnail: extractVideoThumbnail(html),
+      thumbnail,
     };
   }
   return null;
