@@ -8,6 +8,7 @@
 import {
   extractNuxtBlock,
   parseNuxtPostData,
+  timeAgoFromIso,
   type NuxtPostData,
   type NuxtQuotedPost,
 } from "../../src/lib/nuxtPost";
@@ -38,7 +39,7 @@ function metaContent(html: string, property: string): string | null {
 
 /** Strip Pickax's SEO suffix: "user=<name> <N> Followers" */
 function cleanDescription(desc: string): string {
-  return desc.replace(/\s*user=[\w.]+\s+[\d,]+\s+Followers\s*$/i, "").trim();
+  return desc.replace(/\s*user=[\w.-]+\s+[\d,]+\s+Followers\s*$/i, "").trim();
 }
 
 /**
@@ -136,6 +137,13 @@ export interface PostPayload {
   images: string[];
   video: { src: string; title: string; thumbnail: string | null } | null;
   /**
+   * Article headline, from the NUXT payload (isArticle posts only; null
+   * otherwise). Carries the structured title for future headline rendering.
+   * For articles the worker also prepends the title to `text` so it is
+   * visible in the image with zero site changes.
+   */
+  title: string | null;
+  /**
    * The shared-website link card, or null when the post shares no link.
    * Rendered below the post images, exactly like pickax.com.
    */
@@ -196,55 +204,328 @@ function extractLinkCardDOM(html: string): WorkerLinkCard | null {
   }
   return { url, title, domain, imageUrl, description: "" };
 }
-function extractVideo(html: string): { src: string; title: string; thumbnail: string | null } | null {
-  // Pickax ships the oEmbed <iframe> as an escaped string inside the
-  // __NUXT_DATA__ payload (\u003Ciframe src=\"https://rumble.com/embed/…\"),
-  // so unescape payload sequences before looking for the tag. Older markup
-  // had a literal <iframe> in the HTML, which this also still matches.
-  const unescaped = html
+/** Unescape the \u003C / \" / \/ sequences Pickax uses inside __NUXT_DATA__. */
+function unescapePayload(s: string): string {
+  return s
     .replace(/\\u003[cC]/g, "<")
     .replace(/\\u003[eE]/g, ">")
     .replace(/\\"/g, '"')
     .replace(/\\\//g, "/");
-  const tags = unescaped.match(/<iframe([^>]*)>/gi) ?? [];
-  for (const tag of tags) {
-    const srcM = tag.match(/src=["']([^"']+)["']/i);
-    if (!srcM) continue;
-    const src = srcM[1];
-    const isRumble = /rumble\.com\/embed\//i.test(src);
-    // YouTube oEmbed: https://www.youtube.com/embed/<videoId>?feature=oembed
-    const ytM = src.match(
-      /youtube(?:-nocookie)?\.com\/embed\/([A-Za-z0-9_-]{6,})/i
-    );
-    if (!isRumble && !ytM) continue;
-    const titleM = tag.match(/title=["']([^"']*)["']/i);
-    // YouTube always has a thumbnail at i.ytimg.com for the video id
-    // (hqdefault exists for every video; maxresdefault does not).
-    const thumbnail = ytM
-      ? `https://i.ytimg.com/vi/${ytM[1]}/hqdefault.jpg`
-      : extractVideoThumbnail(html);
-    return {
-      src,
-      title: titleM ? decodeEntities(titleM[1]) : "",
-      thumbnail,
-    };
+}
+
+function strVal(v: unknown): string {
+  return typeof v === "string" ? v : v == null ? "" : String(v);
+}
+
+/**
+ * Resolve the post's own node from the __NUXT_DATA__ devalue payload.
+ * parseNuxtPostData() maps the fields the site needs; this returns the raw
+ * resolved node for the extras it drops: the oEmbed dict (post.link when it
+ * is an embed: html / thumbnail_url / inputUrl / type), the native videos[]
+ * array, isArticle + title, countViews, and repostOf titles. Integers at
+ * value positions are slot references (same rule as src/lib/nuxtPost.ts).
+ */
+function resolvePostNode(
+  raw: string,
+  postId: string
+): Record<string, unknown> | null {
+  let slots: unknown[];
+  try {
+    slots = JSON.parse(raw);
+  } catch {
+    return null;
+  }
+  if (!Array.isArray(slots) || slots.length === 0) return null;
+  const memo = new Map<number, unknown>();
+  const inProgress = new Set<number>();
+  const valueOf = (v: unknown): unknown => {
+    if (
+      typeof v === "number" &&
+      Number.isInteger(v) &&
+      v >= 0 &&
+      v < slots.length
+    )
+      return deref(v);
+    if (Array.isArray(v)) return v.map(valueOf);
+    if (v && typeof v === "object") {
+      const o: Record<string, unknown> = {};
+      for (const k of Object.keys(v))
+        o[k] = valueOf((v as Record<string, unknown>)[k]);
+      return o;
+    }
+    return v;
+  };
+  const deref = (idx: number): unknown => {
+    if (memo.has(idx)) return memo.get(idx);
+    if (inProgress.has(idx)) return undefined;
+    inProgress.add(idx);
+    const s = slots[idx];
+    let out: unknown;
+    if (Array.isArray(s)) {
+      const a: unknown[] = [];
+      memo.set(idx, a);
+      for (const item of s) a.push(valueOf(item));
+      out = a;
+    } else if (s && typeof s === "object") {
+      const o: Record<string, unknown> = {};
+      memo.set(idx, o);
+      for (const k of Object.keys(s))
+        o[k] = valueOf((s as Record<string, unknown>)[k]);
+      out = o;
+    } else {
+      out = s;
+    }
+    inProgress.delete(idx);
+    memo.set(idx, out);
+    return out;
+  };
+  let root: unknown;
+  try {
+    root = deref(0);
+  } catch {
+    return null;
+  }
+  const seen = new Set<object>();
+  const stack: unknown[] = [root];
+  while (stack.length > 0) {
+    const cur = stack.pop();
+    if (!cur || typeof cur !== "object") continue;
+    if (seen.has(cur as object)) continue;
+    seen.add(cur as object);
+    const c = cur as Record<string, unknown>;
+    if (String(c.id) === String(postId) && typeof c.content === "string")
+      return c;
+    if (Array.isArray(cur)) {
+      for (const item of cur) stack.push(item);
+    } else {
+      for (const k of Object.keys(c)) stack.push(c[k]);
+    }
   }
   return null;
 }
 
+/** The post's oEmbed dict (post.link when it is an embed), resolved. */
+interface OembedInfo {
+  /** The oEmbed iframe markup (post's own embed only). */
+  html: string;
+  /** Watch/share URL the oEmbed was made for. */
+  inputUrl: string;
+  /** Embed title from the oEmbed dict. */
+  title: string;
+  /** Resolved thumbnail_url (slot refs resolved) — all providers. */
+  thumbnailUrl: string | null;
+}
+
+function oembedFromNode(
+  node: Record<string, unknown> | null
+): OembedInfo | null {
+  if (!node) return null;
+  const l = node.link;
+  if (!l || typeof l !== "object" || Array.isArray(l)) return null;
+  const link = l as Record<string, unknown>;
+  // Genuine shared-website cards have no `html`; embeds (video/rich) do.
+  if (typeof link.html !== "string" || !link.html) return null;
+  const thumb = link.thumbnail_url;
+  return {
+    html: link.html,
+    inputUrl: strVal(link.inputUrl || link.url),
+    title: strVal(link.title),
+    thumbnailUrl: typeof thumb === "string" && thumb ? thumb : null,
+  };
+}
+
+type VideoKind = "rumble" | "youtube" | "spotify" | "apple";
+
+interface VideoCandidate {
+  src: string;
+  title: string;
+  kind: VideoKind;
+  /** Provider's video id, for matching against the oEmbed inputUrl. */
+  key: string | null;
+  /** True when the iframe comes from the post's own oEmbed dict. */
+  own: boolean;
+}
+
+/** Classify a recognized embed iframe; null for anything else. */
+function classifyIframe(src: string): { kind: VideoKind; key: string | null } | null {
+  let m: RegExpMatchArray | null;
+  if (/rumble\.com\/embed\//i.test(src)) {
+    m = src.match(/rumble\.com\/embed\/([A-Za-z0-9]+)/i);
+    return { kind: "rumble", key: m ? m[1] : null };
+  }
+  m = src.match(/youtube(?:-nocookie)?\.com\/embed\/([A-Za-z0-9_-]{6,})/i);
+  if (m) return { kind: "youtube", key: m[1] };
+  m = src.match(
+    /open\.spotify\.com\/embed\/(?:track|album|artist|episode|playlist)\/([A-Za-z0-9]+)/i
+  );
+  if (m) return { kind: "spotify", key: m[1] };
+  m = src.match(/embed\.podcasts\.apple\.com\/[^"'\s]*?\/id(\d+)/i);
+  if (m) return { kind: "apple", key: m[1] };
+  return null;
+}
+
+function iframeTitle(tag: string): string | null {
+  const m = tag.match(/title=["']([^"']*)["']/i);
+  return m ? decodeEntities(m[1]) : null;
+}
+
+/** Page-embedded artwork for Apple Podcasts / Spotify embeds. */
+function providerThumbFromPage(html: string, hostRe: RegExp): string | null {
+  const m = html.match(hostRe);
+  return m ? m[0] : null;
+}
+
 /**
  * The video poster's thumbnail — what the embedded player shows before play,
- * i.e. what you see when viewing the actual post. Rumble's oEmbed thumbnail
- * (served from their CDN) is embedded in the page state.
+ * i.e. what you see when viewing the actual post. Rumble's thumbnail is
+ * embedded in the page state; pre-~Sep-2026 posts serve it from 1a-1791.com
+ * instead of *.cdn.rumble.cloud (both send CORS *, so browsers load them
+ * directly). The oEmbed thumbnail_url (slot refs resolved) is preferred by
+ * the caller; this is the page-regex fallback.
  */
 function extractVideoThumbnail(html: string): string | null {
   const rumbleM = html.match(
-    /https:\/\/[a-z0-9.-]+\.cdn\.rumble\.cloud\/[^"\\\s'<>]+\.(?:jpg|jpeg|png|webp)/i
+    /https:\/\/(?:[a-z0-9.-]+\.cdn\.rumble\.cloud|1a-1791\.com)\/[^"\\\s'<>]+\.(?:jpg|jpeg|png|webp)/i
   );
   if (rumbleM) return rumbleM[0];
   const genericM = html.match(/"thumbnail_url"\s*:\s*"([^"]+)"/);
   if (genericM) return genericM[1].replace(/\\\//g, "/");
   return null;
+}
+
+export interface WorkerVideo {
+  src: string;
+  title: string;
+  thumbnail: string | null;
+}
+
+function extractVideo(
+  html: string,
+  oembed: OembedInfo | null
+): WorkerVideo | null {
+  const cands: VideoCandidate[] = [];
+  const seenSrc = new Set<string>();
+  const push = (tag: string, src: string, own: boolean, fallbackTitle: string) => {
+    const cl = classifyIframe(src);
+    if (!cl) return;
+    const ex = cands.find((c) => c.src === src);
+    if (ex) {
+      if (own) ex.own = true;
+      return;
+    }
+    seenSrc.add(src);
+    cands.push({
+      src,
+      title: iframeTitle(tag) || fallbackTitle,
+      kind: cl.kind,
+      key: cl.key,
+      own,
+    });
+  };
+  // 1. The post's OWN oEmbed iframe — authoritative. The payload also
+  // carries quoted posts' oEmbeds, which must never be mistaken for the
+  // outer post's video.
+  if (oembed) {
+    const tags = unescapePayload(oembed.html).match(/<iframe([^>]*)>/gi) ?? [];
+    for (const tag of tags) {
+      const sm = tag.match(/src=["']([^"']+)["']/i);
+      if (sm) push(tag, decodeEntities(sm[1]), true, oembed.title);
+    }
+  }
+  // 2. Page scan — article-inline videos and legacy markup. Pickax ships
+  // the oEmbed <iframe> as an escaped string inside __NUXT_DATA__
+  // (\u003Ciframe src=\"https://rumble.com/embed/…\"), so unescape payload
+  // sequences before looking for the tag. Older markup had a literal
+  // <iframe> in the HTML, which this also still matches.
+  const tags = unescapePayload(html).match(/<iframe([^>]*)>/gi) ?? [];
+  for (const tag of tags) {
+    const sm = tag.match(/src=["']([^"']+)["']/i);
+    if (sm && !seenSrc.has(decodeEntities(sm[1])))
+      push(tag, decodeEntities(sm[1]), false, "");
+  }
+  if (cands.length === 0) return null;
+
+  const matchesInput = (c: VideoCandidate): boolean =>
+    !!oembed &&
+    c.key !== null &&
+    c.key.length >= 5 &&
+    oembed.inputUrl.includes(c.key);
+
+  // Score: the iframe matching the post's oEmbed inputUrl wins outright;
+  // otherwise prefer a candidate with a resolvable thumbnail (this is what
+  // picks the YouTube video over a thumbnail-less Rumble iframe on
+  // multi-iframe article posts). Document order breaks remaining ties.
+  const scored = cands.map((c, i) => {
+    // The post's own oEmbed thumbnail — but only for the candidate it
+    // belongs to (the oEmbed's own iframe, the only candidate, or the one
+    // matching the oEmbed inputUrl).
+    const ownThumb =
+      oembed?.thumbnailUrl && (c.own || cands.length === 1 || matchesInput(c))
+        ? oembed.thumbnailUrl
+        : null;
+    let thumb: string | null;
+    if (c.kind === "youtube") {
+      // hqdefault exists for every YouTube video; maxresdefault does not.
+      thumb = ownThumb ?? (c.key ? `https://i.ytimg.com/vi/${c.key}/hqdefault.jpg` : null);
+    } else if (c.kind === "rumble") {
+      thumb = ownThumb ?? extractVideoThumbnail(html);
+    } else if (c.kind === "apple") {
+      // Apple's oEmbed thumbnail_url is routinely stale (404s); the
+      // page-embedded artwork — what Pickax itself renders — is reliable.
+      thumb =
+        providerThumbFromPage(html, /https:\/\/is\d-ssl\.mzstatic\.com\/[^"\\\s'<>]+/i) ??
+        ownThumb;
+    } else {
+      // spotify
+      thumb =
+        ownThumb ??
+        providerThumbFromPage(html, /https:\/\/[a-z0-9.-]*spotifycdn\.com\/[^"\\\s'<>]+/i);
+    }
+    const score =
+      (matchesInput(c) ? 10 : 0) + (c.own ? 5 : 0) + (thumb ? 2 : 0);
+    return { c, thumb, score, order: i };
+  });
+  scored.sort((a, b) => b.score - a.score || a.order - b.order);
+  const best = scored[0];
+  return { src: best.c.src, title: best.c.title, thumbnail: best.thumb };
+}
+
+/**
+ * Native video uploads: the __NUXT_DATA__ post node's videos[] array
+ * carries a server-side poster (img.pickax.com/<preview>) plus dimensions
+ * and duration. The .mp4 itself is fetched client-side on play and never
+ * appears in the SSR payload, so the poster is all the tool can show —
+ * exactly what the post displays before play. Renderers draw it cover-fit
+ * into the 16:9 player (downscaling huge posters at draw time).
+ * Multi-video posts: the page SSR shows only the first, so we take videos[0].
+ */
+function nativeVideoFromNode(
+  node: Record<string, unknown> | null
+): WorkerVideo | null {
+  if (!node) return null;
+  const vids = node.videos;
+  if (!Array.isArray(vids) || vids.length === 0) return null;
+  const v = vids[0];
+  if (!v || typeof v !== "object") return null;
+  const preview = (v as Record<string, unknown>).preview;
+  if (typeof preview !== "string" || !preview) return null;
+  const poster = /^https?:\/\//i.test(preview)
+    ? preview
+    : "https://img.pickax.com/" + preview.replace(/^\//, "");
+  return { src: poster, title: "", thumbnail: poster };
+}
+
+/** Absolute timestamp the way the page shows it ("Sep 19, 2026, 9:11 PM"). Pickax SSR renders times in UTC. */
+function formatAbsUtc(iso: string): string | null {
+  const t = Date.parse(iso);
+  if (isNaN(t)) return null;
+  const d = new Date(t);
+  const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+  let h = d.getUTCHours();
+  const ap = h >= 12 ? "PM" : "AM";
+  h = h % 12 || 12;
+  const min = String(d.getUTCMinutes()).padStart(2, "0");
+  return `${months[d.getUTCMonth()]} ${d.getUTCDate()}, ${d.getUTCFullYear()}, ${h}:${min} ${ap}`;
 }
 
 export function extract(html: string, postId: string, postUrl: string): PostPayload | null {
@@ -257,19 +538,25 @@ export function extract(html: string, postId: string, postUrl: string): PostPayl
   const nuxt: NuxtPostData | null = nuxtBlock
     ? parseNuxtPostData(nuxtBlock, postId)
     : null;
+  // Raw resolved post node: the extras parseNuxtPostData drops — the oEmbed
+  // dict (post.link when it is an embed), the native videos[] array,
+  // isArticle/title, countViews, and repostOf titles.
+  const node = nuxtBlock ? resolvePostNode(nuxtBlock, postId) : null;
+  const oembed = oembedFromNode(node);
 
   // Display name + @username: adjacent profile links after the avatar.
   // <a href="/Handle" class="cursor-pointer inline-block overflow-clip">Name</a>
   // <a href="/Handle" class="cursor-pointer text-sm ...">@Handle</a><span title="Sep 19, 2026, 9:11 PM">…</span>
+  // Usernames may contain hyphens (e.g. @FloatingOnSmiles-Fos).
   const nameMatch = html.match(
-    /<a href="\/([\w.]+)"[^>]*class="[^"]*cursor-pointer inline-block overflow-clip"[^>]*>([^<>]{1,80})<\/a>/
+    /<a href="\/([\w.-]+)"[^>]*class="[^"]*cursor-pointer inline-block overflow-clip"[^>]*>([^<>]{1,80})<\/a>/
   );
   const displayName =
     nuxt?.author.displayName ||
     (nameMatch ? decodeEntities(nameMatch[2]).trim() : null) ||
     null;
   const handleMatch = html.match(
-    /<a href="\/[\w.]+"[^>]*class="[^"]*text-sm[^"]*"[^>]*>@([\w.]+)<\/a>/
+    /<a href="\/[\w.-]+"[^>]*class="[^"]*text-sm[^"]*"[^>]*>@([\w.-]+)<\/a>/
   );
   const username =
     nuxt?.author.username ||
@@ -289,7 +576,7 @@ export function extract(html: string, postId: string, postUrl: string): PostPayl
     }
   }
   const timeMatch = html.match(
-    /@[\w.]+<\/a><span title="([^"]+)"[^>]*>([^<>]{1,40})<\/span>/
+    /@[\w.-]+<\/a><span title="([^"]+)"[^>]*>([^<>]{1,40})<\/span>/
   );
 
   // Avatar: the payload's user.avatar is the QUOTER's own profile picture —
@@ -335,35 +622,78 @@ export function extract(html: string, postId: string, postUrl: string): PostPayl
     }
   }
 
+  // Video / embed block: oEmbed iframes first (Rumble, YouTube, Spotify,
+  // Apple Podcasts), then native uploads via the videos[] poster.
+  const video: WorkerVideo | null =
+    extractVideo(html, oembed) || nativeVideoFromNode(node);
+
   // The shared-website link card: payload's post.link when present, DOM
   // fallback otherwise. Generic — works for any website the post shares.
-  const linkCard: WorkerLinkCard | null = nuxt?.linkCard
-    ? {
-        url: nuxt.linkCard.url,
-        title: nuxt.linkCard.title,
-        domain: nuxt.linkCard.domain,
-        imageUrl: nuxt.linkCard.imageUrl,
-        description: nuxt.linkCard.description,
-      }
-    : extractLinkCardDOM(html);
+  // Suppressed whenever an embed block was extracted: on video posts
+  // post.link IS the video oEmbed dict, which used to leak through as an
+  // imageless junk card in the payload (the renderer already hid it).
+  const linkCard: WorkerLinkCard | null = video
+    ? null
+    : nuxt?.linkCard
+      ? {
+          url: nuxt.linkCard.url,
+          title: nuxt.linkCard.title,
+          domain: nuxt.linkCard.domain,
+          imageUrl: nuxt.linkCard.imageUrl,
+          description: nuxt.linkCard.description,
+        }
+      : extractLinkCardDOM(html);
 
   const viewsMatch = html.match(/aria-label="Post views:\s*([\d,]+)"/i);
+  // Articles have no views pill in the DOM; the payload's countViews is
+  // the fallback.
+  const countViews =
+    node && typeof node.countViews === "number" ? node.countViews : null;
+  const views =
+    viewsMatch ? viewsMatch[1] : countViews !== null ? countViews.toLocaleString("en-US") : null;
+
+  // Article headline: the NUXT payload carries isArticle + title. Mapped to
+  // the payload's title field, and prepended to the text so the headline
+  // is visible in the image with zero site changes.
+  const articleTitle =
+    node && node.isArticle === true ? strVal(node.title).trim() : "";
+  const title: string | null = articleTitle || null;
 
   // Post text: the payload's post object is matched by id, so on quote
   // posts the OUTER text can never be mixed up with the quoted text (the
   // old longest-<br>-string heuristic picked whichever was longer).
   const rawDesc = metaContent(html, "og:description");
-  const text =
+  let text: string | null =
     nuxt?.text ||
     extractFullText(html, postId) ||
     (rawDesc ? cleanDescription(rawDesc) : null);
+  if (articleTitle) {
+    text =
+      text && !text.startsWith(articleTitle)
+        ? `${articleTitle}\n\n${text}`
+        : text || articleTitle;
+  }
 
   // NOTE: picks/axes selectors are being confirmed against the live site.
   // They stay null (omitted from the image) until verified — we do NOT reuse
   // the old thumbs-up "like" mapping.
   const { picks, axes } = extractEngagement(html);
   const comments: string | null = null;
-  const video = extractVideo(html);
+
+  // Timestamps: the DOM byline when present; the payload's createdAt
+  // otherwise (article reading views have no standard byline). Pickax SSR
+  // renders times in UTC, so the ISO fallback is formatted in UTC.
+  const createdAt = node ? strVal(node.createdAt) : "";
+  const timestamp = timeMatch
+    ? timeMatch[1] // "Sep 19, 2026, 9:11 PM"
+    : createdAt
+      ? formatAbsUtc(createdAt)
+      : null;
+  const timeAgo = timeMatch
+    ? decodeEntities(timeMatch[2]).trim() // "1 hour ago"
+    : createdAt
+      ? timeAgoFromIso(createdAt) || null
+      : null;
 
   // The quoted post (repostOf) from the payload: the quoted author's own
   // header info, avatar, badge, full text, and timestamp. The payload nests
@@ -379,8 +709,33 @@ export function extract(html: string, postId: string, postUrl: string): PostPayl
     timestamp: nq.timeAgo || null,
     quoted: nq.quoted ? mapQuoted(nq.quoted) : null,
   });
+  // Quote-of-article: repostOf carries content:"" with only the article's
+  // title — fall back to the title so the quoted card isn't empty. Applied
+  // recursively for chains that bottom out at an article.
+  const fixQuotedArticle = (
+    q: WorkerQuotedPost | null,
+    rqNode: unknown
+  ): WorkerQuotedPost | null => {
+    if (!q || !rqNode || typeof rqNode !== "object") return q;
+    const rn = rqNode as Record<string, unknown>;
+    let out = q;
+    if (
+      !q.text &&
+      rn.isArticle === true &&
+      typeof rn.title === "string" &&
+      rn.title.trim()
+    ) {
+      out = { ...q, text: decodeEntities(rn.title.trim()) };
+    }
+    const inner = fixQuotedArticle(q.quoted, rn.repostOf);
+    if (inner !== q.quoted) out = { ...out, quoted: inner };
+    return out;
+  };
   const quoted: WorkerQuotedPost | null = nuxt?.quoted
-    ? mapQuoted(nuxt.quoted)
+    ? fixQuotedArticle(
+        mapQuoted(nuxt.quoted),
+        node ? node.repostOf : null
+      )
     : null;
 
   if (!displayName && !username && !text) return null; // not a recognizable post page
@@ -392,9 +747,10 @@ export function extract(html: string, postId: string, postUrl: string): PostPayl
     username,
     avatarUrl,
     text,
-    timestamp: timeMatch ? timeMatch[1] : null, // "Sep 19, 2026, 9:11 PM"
-    timeAgo: timeMatch ? decodeEntities(timeMatch[2]).trim() : null, // "1 hour ago"
-    views: viewsMatch ? viewsMatch[1] : null,
+    title,
+    timestamp,
+    timeAgo,
+    views,
     picks,
     axes,
     comments,
