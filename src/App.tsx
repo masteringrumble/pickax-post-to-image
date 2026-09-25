@@ -884,8 +884,6 @@ export default function App() {
       <footer className="footer">
         <span>Free tool for the Pickax community</span>
         <span className="dot">•</span>
-        <span>Images are built in your browser — what you make never leaves it</span>
-        <span className="dot">•</span>
         <span>Not affiliated with Pickax</span>
         <span className="dot">•</span>
         <a href="./privacy.html" className="footer-link">
