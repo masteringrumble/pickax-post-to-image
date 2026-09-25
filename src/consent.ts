@@ -76,7 +76,12 @@ export async function enableThirdParties(): Promise<void> {
     /* Share buttons are optional. */
   }
 
-  // Buy Me a Coffee floating widget.
+  // Buy Me a Coffee floating widget. Its script builds the button inside a
+  // DOMContentLoaded listener — when we inject it after consent, that event
+  // has long since fired, so the button never appears. Re-fire the event for
+  // it (safe: ShareThis's ready-helper guards against double-firing and
+  // nothing else on the page listens for DOMContentLoaded). If the document
+  // is still loading, the real event is yet to come — leave it alone.
   try {
     await loadScript("https://cdnjs.buymeacoffee.com/1.0.0/widget.prod.min.js", {
       "data-name": "BMC-Widget",
@@ -89,6 +94,12 @@ export async function enableThirdParties(): Promise<void> {
       "data-x_margin": "18",
       "data-y_margin": "18",
     });
+    if (
+      !document.getElementById("bmc-wbtn") &&
+      document.readyState !== "loading"
+    ) {
+      window.dispatchEvent(new Event("DOMContentLoaded"));
+    }
   } catch {
     /* Donation widget is optional. */
   }
