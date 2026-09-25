@@ -3,7 +3,7 @@
 // pickax.com directly (no CORS headers), so the worker does it where CORS
 // doesn't apply. Public posts only — no login, no session, nothing stored.
 
-export const WORKER_BASE = "https://pickax-post-api.masteringrumble.workers.dev";
+export const WORKER_BASE = "https://api.pickax2image.top";
 
 import type { VerifiedBadge } from "./types";
 
