@@ -8,12 +8,9 @@ import {
   type WorkerPostPayload,
 } from "./api";
 import {
-  BOOKMARKLET,
   clearImportHash,
   parseImportHash,
-  parsePostHtml,
   prettyTimestamp,
-  ImportParseError,
   type ParsedImport,
 } from "./importHtml";
 import { renderPostImage } from "./renderer";
@@ -198,9 +195,6 @@ export default function App() {
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [busy, setBusy] = useState(false);
-  // Collapsed "more ways" section on the URL stage: the page opens showing
-  // only the link box; bookmarklet + paste-source appear on tap.
-  const [showMoreWays, setShowMoreWays] = useState(false);
 
   // manual-entry fields
   const [displayName, setDisplayName] = useState("");
@@ -224,7 +218,6 @@ export default function App() {
   // The post currently shown in the preview stage; drives which toggles are
   // offered (e.g. "Site embed" only appears when the post has a link card).
   const [previewData, setPreviewData] = useState<PostData | null>(null);
-  const [htmlSource, setHtmlSource] = useState("");
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const dataRef = useRef<PostData | null>(null);
 
@@ -258,7 +251,6 @@ export default function App() {
     setImageUrlList([]);
     setPreviewUrl("");
     setOptions(DEFAULT_RENDER_OPTIONS);
-    setHtmlSource("");
     canvasRef.current = null;
     dataRef.current = null;
     setPreviewData(null);
@@ -389,24 +381,6 @@ export default function App() {
     } catch {
       setStage("url");
       setError("Something went wrong while generating the image. Please try again.");
-    }
-  }
-
-  async function handleImportFromHtml() {
-    setError("");
-    setNotice("");
-    if (!htmlSource.trim()) {
-      setError(
-        "Paste the page source first — open the post, press Ctrl+U (Mac: Cmd+Option+U), copy everything, and paste it here."
-      );
-      return;
-    }
-    try {
-      const parsed = parsePostHtml(htmlSource);
-      await importParsed(parsed, false);
-    } catch (e) {
-      if (e instanceof ImportParseError) setError(e.message);
-      else setError("Something went wrong while reading the page source. Please try again.");
     }
   }
 
@@ -600,55 +574,39 @@ export default function App() {
               )}
             </p>
 
-            <button
-              type="button"
-              className="more-ways"
-              aria-expanded={showMoreWays}
-              onClick={() => setShowMoreWays((v) => !v)}
-            >
-              {showMoreWays ? "Fewer ways ▴" : "More ways ▾"}
-            </button>
+            <div className="divider" aria-hidden="true">
+              <span>or do it in one click</span>
+            </div>
 
-            {showMoreWays && (
-              <>
-                <div className="divider" aria-hidden="true">
-                  <span>other ways in</span>
-                </div>
-
-                <h2 className="fast-title">One-click import</h2>
-                <p className="muted small">
-                  Drag this button to your bookmarks bar. Then, while viewing any
-                  Pickax post, click it — the post opens here with everything
-                  filled in.
-                </p>
-                <a
-                  className="btn primary bookmarklet"
-                  href={BOOKMARKLET}
-                  onClick={(e) => e.preventDefault()}
-                  title="Drag me to your bookmarks bar"
-                >
-                  📥 Pickax → Image
-                </a>
-
-                <h2 className="fast-title">Or paste the page source</h2>
-                <p className="muted small">
-                  Open the post in your browser, press{" "}
-                  <kbd>Ctrl</kbd>+<kbd>U</kbd> (Mac: <kbd>⌘</kbd>+<kbd>⌥</kbd>+
-                  <kbd>U</kbd>), copy everything, and paste it below:
-                </p>
-                <textarea
-                  className="text-input textarea mono"
-                  rows={4}
-                  value={htmlSource}
-                  onChange={(e) => setHtmlSource(e.target.value)}
-                  placeholder="Paste the full page source here…"
-                  spellCheck={false}
+            <h2 className="fast-title">Get the browser extension</h2>
+            <p className="muted small">
+              Turn any Pickax post into an image with one click, right from the
+              post page.
+            </p>
+            <div className="store-badges">
+              <a
+                href="https://chromewebstore.google.com/detail/ailpedkkcffcdjkimccmhgimfefgdppl"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                <img
+                  src="./badges/chrome-web-store.png"
+                  alt="Available in the Chrome Web Store"
+                  height={46}
                 />
-                <button className="btn" onClick={handleImportFromHtml}>
-                  Import from page source
-                </button>
-              </>
-            )}
+              </a>
+              <a
+                href="https://addons.mozilla.org/en-US/firefox/addon/pickax-post-to-image/"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                <img
+                  src="./badges/firefox-get-the-addon.svg"
+                  alt="Get the Add-on for Firefox"
+                  height={46}
+                />
+              </a>
+            </div>
           </section>
         )}
 

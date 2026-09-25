@@ -406,6 +406,21 @@ body {
   margin: 22px 0 6px;
 }
 
+.store-badges {
+  display: flex;
+  gap: 14px;
+  justify-content: center;
+  align-items: center;
+  flex-wrap: wrap;
+  margin: 14px 0 4px;
+}
+
+.store-badges img {
+  display: block;
+  height: 46px;
+  width: auto;
+}
+
 .small {
   font-size: 0.9rem;
   line-height: 1.55;
