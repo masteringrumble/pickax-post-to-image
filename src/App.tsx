@@ -889,6 +889,18 @@ export default function App() {
         <a href="./privacy.html" className="footer-link">
           Privacy Policy
         </a>
+        <span className="dot">•</span>
+        <span>
+          New to Pickax?{' '}
+          <a
+            href="https://pickax.com/settings/referral?tab=rewards"
+            className="footer-link"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            Create your free account
+          </a>
+        </span>
       </footer>
       <ConsentBanner />
     </div>
