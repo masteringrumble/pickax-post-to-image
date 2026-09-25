@@ -15,6 +15,7 @@ import {
 } from "./importHtml";
 import { renderPostImage } from "./renderer";
 import ConsentBanner from "./ConsentBanner";
+import { trackEvent } from "./analytics";
 import {
   DEFAULT_RENDER_OPTIONS,
   type LoadedImage,
@@ -232,6 +233,7 @@ export default function App() {
   }, []);
 
   function resetAll() {
+    trackEvent("start_over");
     setStage("url");
     setUrl("");
     setPostId("");
@@ -388,6 +390,7 @@ export default function App() {
   // Primary flow: paste a post URL, the import service reads the public post
   // page, and the image is built from what Pickax actually shows. No typing.
   async function handleGenerateFromUrl() {
+    trackEvent("generate_image", { method: "url" });
     setError("");
     setNotice("");
     const id = extractPostId(url);
@@ -414,6 +417,7 @@ export default function App() {
   }
 
   async function handleGenerateFromManual() {
+    trackEvent("generate_image", { method: "manual" });
     setError("");
     setBusy(true);
     try {
@@ -491,6 +495,7 @@ export default function App() {
   }
 
   function handleDownload() {
+    trackEvent("download_image");
     const canvas = canvasRef.current;
     if (!canvas) return;
     canvas.toBlob((blob) => {
@@ -522,8 +527,10 @@ export default function App() {
 
   const toggle = (key: keyof RenderOptions) => ({
     checked: options[key],
-    onChange: (e: React.ChangeEvent<HTMLInputElement>) =>
-      handleToggleChange({ ...options, [key]: e.target.checked }),
+    onChange: (e: React.ChangeEvent<HTMLInputElement>) => {
+      trackEvent("toggle_option", { option: key, enabled: e.target.checked });
+      handleToggleChange({ ...options, [key]: e.target.checked });
+    },
   });
 
   return (

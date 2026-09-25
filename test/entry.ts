@@ -21,6 +21,7 @@ import {
   extractNuxtBlock,
   parseNuxtPostData,
 } from "../src/lib/nuxtPost";
+import { trackEvent } from "../src/analytics";
 
 // ---- minimal canvas 2d context stub ---------------------------------------
 function makeCtx(): any {
@@ -1435,6 +1436,29 @@ async function main() {
     );
     assert.ok(canvas.width > 0, "zero-count row renders");
     console.log("ok  zero picks/axes show icon only (no number)");
+  }
+
+  // Analytics: trackEvent forwards to gtag when present (post-consent) and
+  // is a silent no-op otherwise — analytics must never break the tool.
+  {
+    const calls: unknown[][] = [];
+    (globalThis as any).window = {
+      gtag: (...args: unknown[]) => {
+        calls.push(args);
+      },
+    };
+    trackEvent("download_image");
+    trackEvent("toggle_option", { option: "showLogo", enabled: false });
+    delete (globalThis as any).window;
+    assert.deepStrictEqual(calls[0], ["event", "download_image", {}]);
+    assert.deepStrictEqual(calls[1], [
+      "event",
+      "toggle_option",
+      { option: "showLogo", enabled: false },
+    ]);
+    // No gtag (declined consent / not loaded yet): must not throw.
+    trackEvent("download_image");
+    console.log("ok  analytics trackEvent forwards to gtag, no-ops without it");
   }
 
   console.log("\nALL SMOKE TESTS PASSED");
