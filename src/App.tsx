@@ -577,12 +577,11 @@ export default function App() {
             <button className="btn primary" onClick={handleGenerateFromUrl}>
               Generate Image
             </button>
-            <p className="hint">
-              Only public posts.
-              {!workerConfigured() && (
-                <> Automatic import is still being switched on for this copy of the app.</>
-              )}
-            </p>
+            {!workerConfigured() && (
+              <p className="hint">
+                Automatic import is still being switched on for this copy of the app.
+              </p>
+            )}
 
             <div className="divider" aria-hidden="true">
               <span>or do it in one click</span>
