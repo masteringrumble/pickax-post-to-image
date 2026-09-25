@@ -3,43 +3,87 @@
 A free tool that turns any public Pickax post into a clean, downloadable
 PNG image.
 
-Paste a Pickax post URL → generate a polished post graphic → download the PNG.
+**Live site:** https://www.pickax2image.top/
 
-## What it does
+Paste a Pickax post URL → the post is imported automatically → customize
+with the "Show in image" toggles → download the PNG.
 
-- Takes a public Pickax post URL (e.g. `https://pickax.com/post/######`)
-- Tries to import the public post data automatically
-- **Limitation:** Pickax does not send CORS headers, so browsers block
-  direct page access. When automatic import is blocked, the app says so
-  plainly and switches to manual entry: you paste the display name,
-  username, post text, timestamp, engagement numbers, and images exactly
-  as they appear on the post. Nothing is ever invented — fields left
-  blank are simply omitted from the image.
-- Renders a clean 1200px-wide graphic on a `<canvas>` (auto-growing
-  height, word-wrapped text preserving line breaks/emojis/hashtags,
-  attached images with aspect ratio preserved, the supplied Pickax logo
-  in the upper-right) and downloads it as `pickax-post-<id>.png`.
+## Browser extension
 
-Only public information is used. No accounts, no backend, no database,
-no analytics — everything runs in your browser.
+Skip the site entirely — do it right on the Pickax page:
 
-## Fast import (no typing)
+- **Chrome / Edge / Brave / Opera:**
+  https://chromewebstore.google.com/detail/ailpedkkcffcdjkimccmhgimfefgdppl
+- **Firefox (desktop & Android):**
+  https://addons.mozilla.org/en-US/firefox/addon/pickax-post-to-image/
 
-**One-click bookmarklet:** drag the "📥 Pickax → Image" button from the
-site to your bookmarks bar. While viewing any Pickax post, click it — the
-post opens in the tool with everything filled in. The bookmarklet runs
-inside the page you're already viewing (so it sees your logged-in session
-too), extracts the public post data from the page itself, and hands it to
-the app. No password is stored anywhere and no server is involved.
+Click the toolbar button on any Pickax page to enter picker mode: hover a
+post card to highlight it, click it, and an options panel pops up right on
+the page with a live preview and the same "Show in image" toggles as the
+website. Download renders the final PNG — everything happens inside the
+extension, the site never opens. Esc cancels.
 
-**Paste the page source:** open the post, press Ctrl+U (Mac:
-Cmd+Option+U), copy everything, paste it into the box on the site, and hit
-"Import from page source".
+Extension source, build/test/packaging docs, and the privacy policy live
+in [`extension/`](extension/) (see `extension/README.md`,
+`extension/PRIVACY.md`, `extension/STORE_LISTING.md`).
 
-Both methods pull the display name, @username, profile picture, post text,
-timestamp, attached images, and like/view counts straight from the page.
-Anything the page doesn't provide stays empty and is omitted from the
-image — nothing is ever invented.
+## How importing works
+
+**Paste a post URL (automatic).** The site sends the URL to a Cloudflare
+Worker (`https://api.pickax2image.top/post?url=…`) that fetches the public
+post page server-side — where Pickax's missing CORS headers don't apply —
+and returns clean JSON: display name, @username, avatar, full post text,
+timestamp, views/picks/axes/comments, verified badge, attached images,
+video thumbnails, link cards, and quoted posts. The form fills itself in.
+
+**Manual entry (fallback).** If the worker can't read a post (private,
+deleted, or temporarily unavailable), the app says so plainly and you can
+fill in the fields yourself: display name, username, post text, timestamp,
+engagement numbers, and images, exactly as they appear on the post.
+Nothing is ever invented — fields left blank are simply omitted from the
+image.
+
+**Legacy bookmarklet.** Older versions of the site offered a "Pickax →
+Image" bookmarklet that opens the app with the post data in a `#import=`
+URL hash. That hash is still honored, so existing bookmarklets keep
+working, but the site no longer advertises it — the worker import and the
+extension cover it.
+
+Only public post information is ever used. No accounts, no logins, no
+database.
+
+## The image
+
+- Rendered on `<canvas>` at 1200px wide with auto-growing height.
+- Full post text, word-wrapped, preserving line breaks, emojis, and
+  hashtags — never truncated.
+- Attached images keep their aspect ratio; avatars are never stretched.
+- Pickax logo in the upper-right; footer shows the post URL and
+  `www.pickax2image.top`.
+- Downloads as `pickax-post-<id>.png`. Very long posts are scaled to fit
+  the 16384px canvas limit.
+
+## Architecture
+
+- **Frontend:** React + Vite static site, served by **Cloudflare Pages**
+  (project `pickax-post-to-image`, unlimited bandwidth) at
+  `https://www.pickax2image.top/`. The apex domain 301-redirects to www.
+  DNS is on Cloudflare.
+- **Backend:** Cloudflare Worker `pickax-post-api` on the custom domain
+  `api.pickax2image.top`:
+  - `GET /post?url=<pickax-post-url>` — server-side post extraction.
+  - `GET /img?url=<image-url>` — CORS proxy so avatars and post images
+    load in the browser (img.pickax.com sends no CORS headers).
+  - Edge cache rules sit in front: successful `/post` responses cached
+    5 minutes, `/img` responses 7 days — repeat views never re-invoke the
+    worker. Errors are never cached. A per-IP rate limit (40 requests /
+    10 seconds) throttles abusers.
+- **Analytics:** Google Analytics on the site, with the owner's own
+  visits excluded via an internal-traffic filter.
+- **Fallbacks:** the worker's `workers.dev` URL stays live as a backup,
+  and the old GitHub Pages build still serves at
+  `https://masteringrumble.github.io/pickax-post-to-image/` (Vite `base`
+  is `"./"` so one build works on every host).
 
 ## Run locally
 
@@ -50,26 +94,41 @@ npm run dev
 
 Then open the printed local URL (usually http://localhost:5173).
 
-## Build
+## Build & test
+
+```bash
+npm run build   # output goes to dist/
+npm run preview # serve the production build locally
+npm test        # unit + smoke tests
+```
+
+The build also copies `dist/index.html` to `dist/404.html` so refreshing
+a deep link never 404s on static hosts.
+
+## Deployment
+
+**Primary — Cloudflare Pages.** Build, then upload `dist/` with the
+direct-upload script (no wrangler needed):
 
 ```bash
 npm run build
+python3 ~/workspace/skills/cloudflare/bin/deploy_pages.py pickax-post-to-image dist
 ```
 
-Output goes to `dist/`. `npm run preview` serves the production build
-locally. The build also copies `dist/index.html` to `dist/404.html` so
-refreshing the GitHub Pages site never 404s.
+The `www.pickax2image.top` custom domain is attached to the Pages
+project; `pickax-post-to-image.pages.dev` works too.
 
-## GitHub Pages deployment
+**Fallback — GitHub Pages.** `.github/workflows/deploy.yml` still builds
+`dist/` and publishes to GitHub Pages on every push to `main`, keeping
+the old `masteringrumble.github.io/pickax-post-to-image/` URL alive.
+Repo one-time setup: Settings → Pages → Source: **GitHub Actions**.
 
-Deployment is automatic via GitHub Actions (`.github/workflows/deploy.yml`):
+## Privacy
 
-1. Push to the `main` branch.
-2. The workflow installs dependencies, runs `npm run build`, and
-   publishes `dist/` to GitHub Pages.
-3. The site is served at `https://www.pickax2image.top/` (custom domain;
-   Vite `base` is `"./"` so the build works on any host or subpath).
-
-One-time setup in the repo: Settings → Pages → Source: **GitHub Actions**,
-Custom domain: `www.pickax2image.top`.
-
+- The worker fetches only public post pages. It stores nothing about
+  you and needs no login.
+- The site keeps everything in your browser; the only network calls are
+  to the worker (post data / images) and Google Analytics.
+- The extension's data practices are documented in
+  [`extension/PRIVACY.md`](extension/PRIVACY.md) — same story: public
+  post data only, fetched through the worker, nothing stored.
