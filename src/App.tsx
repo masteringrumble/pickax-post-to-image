@@ -893,7 +893,7 @@ export default function App() {
         <span>
           New to Pickax?{' '}
           <a
-            href="https://pickax.com/settings/referral?tab=rewards"
+            href="https://pickax.com/?referralCode=9bgj0rc&refSource=copy"
             className="footer-link"
             target="_blank"
             rel="noopener noreferrer"
