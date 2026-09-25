@@ -578,8 +578,8 @@ export default function App() {
               Generate Image
             </button>
             <p className="hint">
-              Only public posts. The image is built in your browser — we never
-              store the images you create. Public post photos may be cached
+              Only public posts. What you make stays in your browser — we never
+              see it or store it. The post's own photos may sit in our cache
               up to 7 days for speed.
               {!workerConfigured() && (
                 <> Automatic import is still being switched on for this copy of the app.</>
@@ -887,7 +887,7 @@ export default function App() {
       <footer className="footer">
         <span>Free tool for the Pickax community</span>
         <span className="dot">•</span>
-        <span>Images are built in your browser — we never store the images you create</span>
+        <span>Images are built in your browser — what you make never leaves it</span>
         <span className="dot">•</span>
         <span>Not affiliated with Pickax</span>
         <span className="dot">•</span>
