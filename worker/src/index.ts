@@ -769,28 +769,14 @@ function jsonResponse(data: unknown, status = 200): Response {
     headers: {
       "Content-Type": "application/json",
       "Access-Control-Allow-Origin": "*",
-      // Successful post payloads are public and safe to cache (5 min).
-      // Errors are never cached — a cached 404/502 would poison retries.
-      "Cache-Control": status === 200 ? "public, max-age=300" : "no-store",
+      "Cache-Control": "public, max-age=300",
     },
   });
 }
 
 export default {
-  async fetch(
-    request: Request,
-    _env: unknown,
-    ctx: ExecutionContext
-  ): Promise<Response> {
+  async fetch(request: Request): Promise<Response> {
     const url = new URL(request.url);
-    // Edge cache for successful responses. Keyed by the full request URL,
-    // so /post?url=<post> and /img?url=<image> each cache independently.
-    // This collapses traffic spikes: one pickax.com fetch serves every
-    // repeat render until the TTL expires. Errors are never cached.
-    // NOTE: this is the Worker's own cache — it still counts as a Worker
-    // invocation. Only a CDN cache in FRONT of the worker (custom domain
-    // behind Cloudflare proxy) would skip invocations entirely.
-    const cache = caches.default;
 
     if (request.method === "OPTIONS") {
       return new Response(null, {
@@ -803,10 +789,6 @@ export default {
 
 
     if (url.pathname === "/img") {
-      const cacheKey = new Request(url.toString(), { method: "GET" });
-      const hit = await cache.match(cacheKey);
-      if (hit) return hit;
-
       const target = (url.searchParams.get("url") ?? "").trim();
       let parsed: URL;
       try {
@@ -837,16 +819,13 @@ export default {
         return jsonResponse({ error: "fetch-failed", hint: `img.pickax.com returned ${res.status}` }, 502);
       }
       const contentType = res.headers.get("Content-Type") ?? "image/jpeg";
-      const out = new Response(res.body, {
+      return new Response(res.body, {
         headers: {
           "Content-Type": contentType,
           "Access-Control-Allow-Origin": "*",
-          // Images are effectively immutable: cache a week.
-          "Cache-Control": "public, max-age=604800",
+          "Cache-Control": "public, max-age=86400",
         },
       });
-      ctx.waitUntil(cache.put(cacheKey, out.clone()));
-      return out;
     }
 
     if (url.pathname !== "/post") {
@@ -863,12 +842,6 @@ export default {
     }
     const postId = m[1];
     const canonical = `https://pickax.com/post/${postId}`;
-
-    // One pickax.com fetch per post per 5 minutes, no matter how many
-    // people render it in that window.
-    const postCacheKey = new Request(url.toString(), { method: "GET" });
-    const postHit = await cache.match(postCacheKey);
-    if (postHit) return postHit;
 
     let res: Response;
     try {
@@ -890,8 +863,6 @@ export default {
     const html = await res.text();
     const payload = extract(html, postId, canonical);
     if (!payload) return jsonResponse({ error: "not-found", hint: "No recognizable post content on this page" }, 404);
-    const out = jsonResponse(payload);
-    ctx.waitUntil(cache.put(postCacheKey, out.clone()));
-    return out;
+    return jsonResponse(payload);
   },
 };
