@@ -882,6 +882,18 @@ export default function App() {
         )}
       </main>
       <footer className="footer">
+        <span>
+          Don&apos;t have a Pickax account?{' '}
+          <a
+            href="https://pickax.com/?referralCode=9bgj0rc&refSource=copy"
+            className="footer-link"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            Sign up here
+          </a>
+        </span>
+        <span className="dot">•</span>
         <span>Free tool for the Pickax community</span>
         <span className="dot">•</span>
         <span>Not affiliated with Pickax</span>
@@ -889,18 +901,6 @@ export default function App() {
         <a href="./privacy.html" className="footer-link">
           Privacy Policy
         </a>
-        <span className="dot">•</span>
-        <span>
-          New to Pickax?{' '}
-          <a
-            href="https://pickax.com/?referralCode=9bgj0rc&refSource=copy"
-            className="footer-link"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Create your free account
-          </a>
-        </span>
       </footer>
       <ConsentBanner />
     </div>
