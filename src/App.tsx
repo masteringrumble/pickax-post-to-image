@@ -571,8 +571,8 @@ export default function App() {
               Generate Image
             </button>
             <p className="hint">
-              Only public posts. Nothing of yours is posted, stored, or shared — the
-              image is built right in your browser.
+              Only public posts. The image is built right in your browser —
+              generated images are never uploaded, stored, or shared.
               {!workerConfigured() && (
                 <> Automatic import is still being switched on for this copy of the app.</>
               )}
@@ -879,7 +879,7 @@ export default function App() {
       <footer className="footer">
         <span>Free tool for the Pickax community</span>
         <span className="dot">•</span>
-        <span>Images are built in your browser — nothing of yours is uploaded or stored</span>
+        <span>Images are built in your browser — generated images are never uploaded or stored</span>
         <span className="dot">•</span>
         <span>Not affiliated with Pickax</span>
         <span className="dot">•</span>
