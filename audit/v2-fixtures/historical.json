@@ -1,0 +1,258 @@
+{
+  "oldest_post_id": 1,
+  "oldest_post_url": "https://pickax.com/post/1",
+  "audit_date": "2026-09-24",
+  "method": "curl (logged-out, 2s between requests) + production extractors (worker/src/index.ts extract() and src/lib/nuxtPost.ts parseNuxtPostData, bundled via esbuild) run against saved HTML; every claim cites a real fetched URL.",
+  "floor_proof": "post 0 and post 999999999 both return HTTP 404 with byte-identical 'Post not found' pages (only the /post/<id> path in the payload differs); post 1 returns HTTP 200 ('hello world!' by @david, 2024-07-28T11:58:51Z).",
+  "id_to_date_map": {
+    "1": "2024-07-28",
+    "100": "2024-08-01",
+    "1000": "2024-08-27",
+    "2000": "2024-09-30",
+    "2500": "2024-10-17",
+    "3000": "2024-10-24",
+    "3500": "2024-11-06",
+    "4500": "2024-12-19",
+    "6000": "2025-02-10",
+    "8000": "2025-03-02",
+    "10000": "2025-04-04",
+    "80000": "2025-07-29",
+    "85000": "2025-08-20",
+    "100000": "2025-10-02",
+    "260000": "2026-03-15",
+    "300000": "2026-04-27",
+    "400000": "2026-06-19",
+    "500000": "2026-08-14",
+    "600000": "2026-09-05",
+    "650000": "2026-09-14",
+    "700000": "2026-09-19",
+    "750000": "2026-09 (baseline current)",
+    "3300": "2024-11-03",
+    "330000": "2026-05-16",
+    "9000": "2025-03-17",
+    "99": "2024-08-01"
+  },
+  "dead_id_ranges_sampled": [
+    4000,
+    15000,
+    20000,
+    25000,
+    40000,
+    50000,
+    60000,
+    65000,
+    70000,
+    75000,
+    95000,
+    110000,
+    130000,
+    160000,
+    180000,
+    200000,
+    220000,
+    360000
+  ],
+  "dead_ranges_note": "IDs are NOT strictly sequential: whole blocks 404 (e.g. ~15000-95000, ~110000-220000). Dead-range 404s are byte-identical to never-existed 404s, so deleted vs never-created is indistinguishable from outside.",
+  "era_samples": [
+    {
+      "url": "https://pickax.com/post/1",
+      "approx_date": "2024-07-28",
+      "markup_notes": "Oldest post. Author 'david ovari' @david, gold verified (creator record non-null). __NUXT_DATA__ devalue payload has the full modern schema: post{id,content,createdAt,user{fullname,username,avatar,is_verified,creator},attachments,link,repostOf}. Avatar img markup identical to current: <img src=\"https://img.pickax.com/user-2/...jpeg\" alt loading=\"lazy\" decoding=\"async\" class=\"rounded-full object-cover w-10 h-10 min-w-10\">. Byline anchor classes, time <span title>, verified-seal SVG path 12.7893 4.26666, picks gradient #0083f5, axes gradient #dc1919, aria-label=\"Post views: 30\" all present. Production extraction returns every field correctly.",
+      "differs_from_current": []
+    },
+    {
+      "url": "https://pickax.com/post/100",
+      "approx_date": "2024-08-01",
+      "markup_notes": "Quote post (quotes post 99). repostOf object present with same key set as current (id,createdAt,content,image,userId,attachments,user,videos,link,repostOf,_count...). Quoted author user{fullname,username,avatar,creator} resolves; quoted avatar on img.pickax.com. Outer/quoted text attribution correct via id-matched payload parse.",
+      "differs_from_current": []
+    },
+    {
+      "url": "https://pickax.com/post/1000",
+      "approx_date": "2024-08-27",
+      "markup_notes": "Quote post. Same repostOf schema as post 100 and current. All DOM markers present.",
+      "differs_from_current": []
+    },
+    {
+      "url": "https://pickax.com/post/2500",
+      "approx_date": "2024-10-17",
+      "markup_notes": "Rumble video post ('Live On KLRNRadio'). oEmbed iframe is ALREADY the escaped form inside the payload (\\u003Ciframe src=\"https://rumble.com/embed/v5gsa39/\" ...); zero literal <iframe> in HTML. post.link is NULL (Rumble oEmbed not attached to post yet) so no linkCard is produced. thumbnail_url resolves to https://1a-1791.com/video/... (old Rumble thumbnail host, not *.cdn.rumble.cloud).",
+      "differs_from_current": [
+        "video.thumbnail is null: thumbnail_url host is 1a-1791.com, which the *.cdn.rumble.cloud regex does not match, and the \"thumbnail_url\":\"...\" literal regex cannot match a devalue slot reference (\"thumbnail_url\":35). Current code returns thumbnail:null for this post.",
+        "post.link is null so no linkCard is emitted (current-era Rumble video posts DO emit a linkCard with empty imageUrl — see post 650000)."
+      ]
+    },
+    {
+      "url": "https://pickax.com/post/3000",
+      "approx_date": "2024-10-24",
+      "markup_notes": "YouTube video post. Escaped oEmbed iframe in payload (https://www.youtube.com/embed/pPkU4-zO2a0?feature=oembed). post.link ALREADY points at the oEmbed dict (type:'video') in Oct 2024. Current extractor handles it fully: src, title, thumbnail=https://i.ytimg.com/vi/pPkU4-zO2a0/hqdefault.jpg.",
+      "differs_from_current": []
+    },
+    {
+      "url": "https://pickax.com/post/3500",
+      "approx_date": "2024-11-06",
+      "markup_notes": "Rumble video post. Same as 2500: escaped iframe, post.link null (no linkCard), thumbnail_url on 1a-1791.com -> thumbnail null under current extraction.",
+      "differs_from_current": [
+        "video.thumbnail is null (old 1a-1791.com thumbnail host not matched by current extractor).",
+        "post.link is null so no linkCard is emitted (differs from current-era video posts)."
+      ]
+    },
+    {
+      "url": "https://pickax.com/post/4500",
+      "approx_date": "2024-12-19",
+      "markup_notes": "Article post (isArticle:true), 1819-char text, BLUE verified badge (is_verified:true, creator null — badge rule holds), one .webp attachment (https://img.pickax.com/user-193/a360e9bd-....webp), ft.com link card with img.pickax.com/metadata/... preview image and description. Long text, \\r\\n breaks, entities all cleaned correctly. Post-image DOM markup: <img ... class=\"w-full h-full object-cover\" data-v-...> (same shape as current).",
+      "differs_from_current": []
+    },
+    {
+      "url": "https://pickax.com/post/8000",
+      "approx_date": "2025-03-02",
+      "markup_notes": "Image-only post: text empty (content ''), one attachment extracted from payload attachments[type=image]. Author unverified (verified:null) — no badge, extraction fine. og:description absent; extractor falls back to payload text (empty) without error.",
+      "differs_from_current": []
+    },
+    {
+      "url": "https://pickax.com/post/10000",
+      "approx_date": "2025-04-04",
+      "markup_notes": "Quote post, blue badge author. repostOf schema unchanged.",
+      "differs_from_current": []
+    },
+    {
+      "url": "https://pickax.com/post/80000",
+      "approx_date": "2025-07-29",
+      "markup_notes": "Rumble video post. post.link now points at the oEmbed dict (type:'video') — the Rumble oEmbed attachment happened between 2024-11-06 (post 3500, null) and 2025-07-29. Extractor therefore emits video AND a linkCard{url:rumble watch page, domain:rumble.com, imageUrl:''}. thumbnail_url still on 1a-1791.com -> thumbnail null. Site DOM shows no link card for video posts (no div[title]/metadata img), so the payload-derived linkCard is spurious.",
+      "differs_from_current": [
+        "video.thumbnail is null (old 1a-1791.com thumbnail host not matched)."
+      ]
+    },
+    {
+      "url": "https://pickax.com/post/85000",
+      "approx_date": "2025-08-20",
+      "markup_notes": "Rumble video post, same shape as 80000 (post.link=oEmbed, thumbnail 1a-1791.com -> null, spurious imageless linkCard). countViews=0 so the page omits the views element entirely -> extractor views:null (correct, not a markup change).",
+      "differs_from_current": [
+        "video.thumbnail is null (old 1a-1791.com thumbnail host not matched)."
+      ]
+    },
+    {
+      "url": "https://pickax.com/post/100000",
+      "approx_date": "2025-10-02",
+      "markup_notes": "Standard link-card post (gatewayhispanic.com). Payload link keys exactly as current: {url,image,title,inputUrl,description}; preview image at img.pickax.com/metadata/.... DOM link card div[title] shape matches the extractLinkCardDOM fallback. Post text uses \\r<br> breaks, hashtags and @mentions — cleaned correctly.",
+      "differs_from_current": []
+    },
+    {
+      "url": "https://pickax.com/post/260000",
+      "approx_date": "2026-03-15",
+      "markup_notes": "Author @FloatingOnSmiles-Fos has user.avatar=null (account exists — profile returns HTTP 200 — they just never set an avatar). Page renders NO avatar img at all (zero rounded-full imgs) and a compact header variant: no display-name anchor, only @handle + time span in a flex div. countViews=0 so no views element.",
+      "differs_from_current": [
+        "Hyphenated username breaks DOM-only fields: timeMatch/handleMatch/nameMatch use [\\w.] which excludes '-', so timestamp/timeAgo are null (verified: hyphen-tolerant regex matches). username/displayName are saved by the payload path, but timestamp and timeAgo come only from DOM. Affects any-era posts by hyphenated users, not just old ones."
+      ]
+    },
+    {
+      "url": "https://pickax.com/post/300000",
+      "approx_date": "2026-04-27",
+      "markup_notes": "Standard post, gold badge. All markers current-shape.",
+      "differs_from_current": []
+    },
+    {
+      "url": "https://pickax.com/post/600000",
+      "approx_date": "2026-09-05",
+      "markup_notes": "Link-card post (disneyfoodblog.com). Payload link keys and DOM div[title] card identical to 2025-10 sample.",
+      "differs_from_current": []
+    },
+    {
+      "url": "https://pickax.com/post/650000",
+      "approx_date": "2026-09-14",
+      "markup_notes": "Current-era Rumble video post (baseline for 'new' behavior). thumbnail_url on hugh.cdn.rumble.cloud — appears as a literal string inside the devalue slot, so the *.cdn.rumble.cloud regex finds it -> thumbnail extracted. post.link=oEmbed -> video + imageless linkCard both emitted (same spurious-linkCard behavior as 2025 video posts). Escaped iframe format unchanged.",
+      "differs_from_current": []
+    },
+    {
+      "url": "https://pickax.com/post/750000",
+      "approx_date": "2026-09",
+      "markup_notes": "Current baseline. Reference for all comparisons above.",
+      "differs_from_current": []
+    }
+  ],
+  "cross_era_constants": [
+    "__NUXT_DATA__ devalue payload schema unchanged since post 1 (2024-07-28): post{id,content,createdAt,user{fullname,username,avatar,is_verified,creator},attachments[{url,type}],link{url,image,title,inputUrl,description},repostOf{...same shape, nested}}.",
+    "Avatar img markup identical all eras: <img src=\"https://img.pickax.com/...\" alt loading=\"lazy\" decoding=\"async\" class=\"rounded-full object-cover w-10 h-10 min-w-10\">.",
+    "Byline: <a class=\"cursor-pointer inline-block overflow-clip\"> display name, <a class=\"...text-sm...\">@handle</a><span title=\"absolute\">relative</span>; verified seal SVG path '12.7893 4.26666'; picks button gradient #0083f5, axes #dc1919 with count in bare <div>; views via aria-label=\"Post views: N\" (omitted when 0).",
+    "Video embeds: escaped oEmbed iframe (\\u003Ciframe src=\"https://rumble.com/embed/...\" or https://www.youtube.com/embed/...) inside the payload in every video post sampled back to 2024-10-17. NO literal <iframe> found in any era — the 'pre-Sep-2026 literal iframe' hypothesis is not supported by evidence.",
+    "All images (avatars, attachments, link-card previews) on https://img.pickax.com in every era (user-<id>/..., metadata/...).",
+    "Link-card payload keys {url,image,title,inputUrl,description} and DOM div[title] card shape identical Oct 2025 vs Sep 2026.",
+    "Quote (repostOf) schema and nesting unchanged since 2024-08-01."
+  ],
+  "historical_changes_found": [
+    "Rumble oEmbed attached to post.link between 2024-11-06 and 2025-07-29 (YouTube oEmbeds were attached by 2024-10-24 at latest). Effect: video posts since ~2025 yield BOTH video and a linkCard{url:watch page, imageUrl:''}; the site renders no link card for video posts, so the linkCard is spurious (present-day behavior too, not just old).",
+    "Rumble thumbnail CDN host changed from 1a-1791.com (seen 2024-10 through 2025-08) to *.cdn.rumble.cloud (seen 2026-09-14). This is the Sep-2026 thumbnail breakage root cause from the Rumble side."
+  ],
+  "extraction_gaps_confirmed": [
+    {
+      "gap": "Old Rumble video posts get video.thumbnail=null",
+      "posts": [
+        "https://pickax.com/post/2500",
+        "https://pickax.com/post/3500",
+        "https://pickax.com/post/80000",
+        "https://pickax.com/post/85000"
+      ],
+      "mechanism": "extractVideoThumbnail only matches https://*.cdn.rumble.cloud/... literally, or \"thumbnail_url\":\"...\" as a literal JSON pair. Old posts use host 1a-1791.com, and in devalue the pair is \"thumbnail_url\":<slot> (a numeric reference), so neither regex can match. The URL is recoverable — it sits as a plain string in the devalue slots — but current code never resolves it."
+    },
+    {
+      "gap": "Hyphenated usernames lose timestamp/timeAgo (DOM-only fields)",
+      "posts": [
+        "https://pickax.com/post/260000"
+      ],
+      "mechanism": "timeMatch / handleMatch / nameMatch href use [\\w.] which excludes '-'. '@FloatingOnSmiles-Fos</a><span title=...>' fails to match, so timestamp/timeAgo are null. username/displayName survive via the payload path. Any-era issue, found on a 2026 post but equally applicable to old posts."
+    },
+    {
+      "gap": "Spurious imageless linkCard on video posts (payload-derived)",
+      "posts": [
+        "https://pickax.com/post/3000",
+        "https://pickax.com/post/80000",
+        "https://pickax.com/post/85000",
+        "https://pickax.com/post/650000",
+        "https://pickax.com/post/330000 (counter-example: 2026-05-16 YouTube video post with post.link=null -> NO linkCard, clean)"
+      ],
+      "mechanism": "linkCardFromPost maps post.link unconditionally; for video posts link is the oEmbed object (type:'video') with no 'image' key, yielding {url:watch URL, domain, title, imageUrl:''}. The DOM fallback (requiring img.pickax.com/metadata/) correctly finds no card, but the payload path wins. Present in current behavior as well. Attachment is intermittent: e.g. post 330000 (2026-05-16, YouTube) has post.link=null and yields a clean video-only payload, so the spurious card appears only when the oEmbed happened to be attached."
+    }
+  ],
+  "edge_cases": [
+    {
+      "url": "https://pickax.com/post/50000",
+      "type": "deleted-post",
+      "notes": "HTTP 404, 'Post not found' (statusCode 404 in payload). Page is byte-identical to the 404 for never-existed IDs (post 0, post 999999999) apart from the /post/<id> path string — deleted vs never-created are indistinguishable externally. The worker's extract() returns null (no displayName/username/text) -> 404 'not-found', so the tool's reliance on 404 is safe. Other dead IDs sampled: 4000, 15000, 20000, 25000, 40000, 60000, 75000, 95000, 110000, 130000, 160000, 180000, 200000, 220000, 360000."
+    },
+    {
+      "url": "https://pickax.com/post/260000",
+      "type": "no-avatar-author",
+      "notes": "user.avatar=null in payload (author @FloatingOnSmiles-Fos never set an avatar; profile page returns HTTP 200 so the account exists). Extractor returns avatarUrl:null; page renders no avatar img and a compact header (no display-name anchor). Handled gracefully — no crash, no wrong avatar."
+    },
+    {
+      "url": "https://pickax.com/post/4500",
+      "type": "long-text",
+      "notes": "1819 characters, article post (isArticle:true), with \\r\\n breaks and HTML entities. cleanPostText handles it; full text extracted. Also carries a .webp attachment and blue verified badge."
+    },
+    {
+      "url": "https://pickax.com/post/8000",
+      "type": "empty-text-image-post",
+      "notes": "content is '' with one image attachment; og:description absent. Extractor returns text:'' (empty) with the image — no error."
+    },
+    {
+      "url": "https://pickax.com/post/85000",
+      "type": "zero-views",
+      "notes": "countViews=0 -> the page omits the views element entirely; extractor returns views:null. Correct behavior, not a markup change. Same on post 260000."
+    },
+    {
+      "url": "https://pickax.com/post/100000",
+      "type": "heavy-formatting-text",
+      "notes": "658-char text with \\r<br> breaks, escaped quotes, #hashtags and @mentions preserved as plain text. Extraction clean."
+    },
+    {
+      "url": null,
+      "type": "private-restricted-post",
+      "notes": "UNTESTABLE without sign-in (forbidden by task rules). No public signal found for how restricted posts render to logged-out viewers; the extractor's null-guard (returns null when no displayName/username/text) is the only safety net."
+    },
+    {
+      "url": "https://pickax.com/post/99",
+      "type": "weird-attachment-filename",
+      "notes": "2024-08-01. Attachment path contains a literal SPACE and U+202F (narrow no-break space): 'user-10/Screenshot 2024-08-01 at 6.48.38<U+202F>AM.png-a15c1160-....png'. Extractor passes it through verbatim as https://img.pickax.com/... (un-encoded). Downstream image fetching must URL-encode it. Also has 3393-char text — longest sampled, extracted cleanly."
+    }
+  ],
+  "incidental_note": "worker/src/index.ts on disk (mtime 2026-09-24 21:17 UTC) already contains YouTube oEmbed support in extractVideo (youtube.com/embed/<id> -> i.ytimg.com thumbnail), which the audit harness used. An earlier read of the file during this session showed a rumble-only version; all extraction results above were produced from the current on-disk source."
+}

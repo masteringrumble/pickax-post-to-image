@@ -1,0 +1,1680 @@
+{
+ "fixtures": [
+  {
+   "url": "https://pickax.com/post/1",
+   "type": "regular",
+   "source": "historical",
+   "extraction": {
+    "video": null,
+    "thumbnail": null,
+    "avatar": "PRESENT",
+    "images": 0,
+    "linkCard": null,
+    "quoted": null,
+    "title_or_text": "hello world!",
+    "textLen": 12,
+    "timestamp": "Jul 28, 2024, 11:58 AM",
+    "timeAgo": "Jul 28, 2024",
+    "views": "30",
+    "picks": "15",
+    "axes": "1",
+    "verified": "gold",
+    "username": "david",
+    "displayName": "david ovari"
+   },
+   "render": {
+    "ok": true,
+    "dimensions": "2400x1134",
+    "failedImages": [],
+    "errors": [],
+    "notes": "videoThumbUsed=False; linkCardRendered=False",
+    "anomalies": []
+   },
+   "verdict": "works",
+   "specifics": "Oldest post (2024-07-28): all fields extract; renders 2400x1134."
+  },
+  {
+   "url": "https://pickax.com/post/99",
+   "type": "article",
+   "source": "historical",
+   "extraction": {
+    "video": null,
+    "thumbnail": null,
+    "avatar": "PRESENT",
+    "images": 1,
+    "linkCard": null,
+    "quoted": null,
+    "title_or_text": "For months, the mainstream media has hyped the bird flu as the next crisis, ampl",
+    "textLen": 3393,
+    "timestamp": null,
+    "timeAgo": null,
+    "views": null,
+    "picks": "0",
+    "axes": "0",
+    "verified": "gold",
+    "username": "FreedomFirstNetwork",
+    "displayName": "Freedom First Network"
+   },
+   "render": {
+    "ok": true,
+    "dimensions": "2400x11173",
+    "failedImages": [],
+    "errors": [],
+    "notes": "videoThumbUsed=False; linkCardRendered=False; imagesRendered=1",
+    "anomalies": []
+   },
+   "verdict": "broken",
+   "specifics": "Article (2024): 3393-char text + weird-filename image (space + U+202F) extracted; image URL encoded and downloaded fine. timestamp/timeAgo/views null - this is an ARTICLE reading-view page (no standard byline), same markup gap as other articles."
+  },
+  {
+   "url": "https://pickax.com/post/100",
+   "type": "quote",
+   "source": "historical",
+   "extraction": {
+    "video": null,
+    "thumbnail": null,
+    "avatar": "PRESENT",
+    "images": 0,
+    "linkCard": null,
+    "quoted": {
+     "postId": "99",
+     "username": "FreedomFirstNetwork",
+     "textLen": 0
+    },
+    "title_or_text": "For months, the mainstream media has hyped the bird flu as the next crisis. Now,",
+    "textLen": 610,
+    "timestamp": "Aug 1, 2024, 1:50 PM",
+    "timeAgo": "Aug 1, 2024",
+    "views": null,
+    "picks": "3",
+    "axes": "0",
+    "verified": "gold",
+    "username": "FreedomFirstNetwork",
+    "displayName": "Freedom First Network"
+   },
+   "render": {
+    "ok": true,
+    "dimensions": "2400x3308",
+    "failedImages": [],
+    "errors": [],
+    "notes": "videoThumbUsed=False; linkCardRendered=False",
+    "anomalies": []
+   },
+   "verdict": "works",
+   "specifics": "Quote post: quoted author+text+avatar extracted; nested render ok (2400x3308)."
+  },
+  {
+   "url": "https://pickax.com/post/1000",
+   "type": "quote",
+   "source": "historical",
+   "extraction": {
+    "video": null,
+    "thumbnail": null,
+    "avatar": "PRESENT",
+    "images": 0,
+    "linkCard": null,
+    "quoted": {
+     "postId": "994",
+     "username": "JeffDornik",
+     "textLen": 0
+    },
+    "title_or_text": "Mark Zuckerberg's letter to Congress finally admitting their part in coordinatin",
+    "textLen": 616,
+    "timestamp": "Aug 27, 2024, 8:45 PM",
+    "timeAgo": "Aug 27, 2024",
+    "views": null,
+    "picks": "1",
+    "axes": "0",
+    "verified": "gold",
+    "username": "JeffDornik",
+    "displayName": "Jeff Dornik"
+   },
+   "render": {
+    "ok": true,
+    "dimensions": "2400x3524",
+    "failedImages": [],
+    "errors": [],
+    "notes": "videoThumbUsed=False; linkCardRendered=False",
+    "anomalies": []
+   },
+   "verdict": "works",
+   "specifics": "Quote post: same as 100."
+  },
+  {
+   "url": "https://pickax.com/post/2500",
+   "type": "rumble-video",
+   "source": "historical",
+   "extraction": {
+    "video": {
+     "src": "https://rumble.com/embed/v5gsa39/",
+     "title": "Live On KLRNRadio -- used when contious brodcasts are running",
+     "thumbnail": null
+    },
+    "thumbnail": null,
+    "avatar": "PRESENT",
+    "images": 0,
+    "linkCard": null,
+    "quoted": {
+     "postId": "2495",
+     "username": "JeffDornik",
+     "textLen": 94
+    },
+    "title_or_text": "It was fun we should do it again soon!",
+    "textLen": 38,
+    "timestamp": "Oct 17, 2024, 11:15 PM",
+    "timeAgo": "Oct 17, 2024",
+    "views": "1",
+    "picks": "0",
+    "axes": "0",
+    "verified": "gold",
+    "username": "RowdyRick73",
+    "displayName": "Rick Robinson"
+   },
+   "render": {
+    "ok": true,
+    "dimensions": "2400x3310",
+    "failedImages": [],
+    "errors": [],
+    "notes": "videoThumbUsed=False; linkCardRendered=False",
+    "anomalies": []
+   },
+   "verdict": "broken",
+   "specifics": "GAP1 CONFIRMED: old Rumble post, video.thumbnail=null although page literally contains https://1a-1791.com/video/...jpg - extractor regex only matches *.cdn.rumble.cloud and cannot resolve devalue slot references. Video renders as dark placeholder. No linkCard (post.link null, correct for this era)."
+  },
+  {
+   "url": "https://pickax.com/post/3000",
+   "type": "youtube-video",
+   "source": "historical",
+   "extraction": {
+    "video": {
+     "src": "https://www.youtube.com/embed/pPkU4-zO2a0?feature=oembed",
+     "title": "Kamala Exposed: The Shocking Truth That Could End Her Political Career",
+     "thumbnail": "PRESENT"
+    },
+    "thumbnail": null,
+    "avatar": "PRESENT",
+    "images": 0,
+    "linkCard": {
+     "url": "https://www.youtube.com/watch?v=pPkU4-zO2a0",
+     "domain": "youtube.com",
+     "title": "Kamala Exposed: The Shocking Truth That Could End Her Politi",
+     "image": "EMPTY",
+     "description": ""
+    },
+    "quoted": null,
+    "title_or_text": "",
+    "textLen": 0,
+    "timestamp": "Oct 24, 2024, 11:41 PM",
+    "timeAgo": "Oct 24, 2024",
+    "views": "1",
+    "picks": "0",
+    "axes": "0",
+    "verified": null,
+    "username": "TLA",
+    "displayName": "TLA"
+   },
+   "render": {
+    "ok": true,
+    "dimensions": "2400x2258",
+    "failedImages": [],
+    "errors": [],
+    "notes": "videoThumbUsed=True; linkCardRendered=False",
+    "anomalies": []
+   },
+   "verdict": "broken",
+   "specifics": "2024 YouTube video: video+thumbnail extract fine (proves YouTube support predates the new fix). Spurious imageless linkCard(youtube.com) in payload (oEmbed attached to post.link); masked by renderer on video posts."
+  },
+  {
+   "url": "https://pickax.com/post/3500",
+   "type": "rumble-video",
+   "source": "historical",
+   "extraction": {
+    "video": {
+     "src": "https://rumble.com/embed/v5kbblh/",
+     "title": "What Does Snakes And Cigarettes Have In Common?| Dr Bryan Ardis",
+     "thumbnail": null
+    },
+    "thumbnail": null,
+    "avatar": "PRESENT",
+    "images": 0,
+    "linkCard": null,
+    "quoted": null,
+    "title_or_text": "That's an interesting headline!",
+    "textLen": 31,
+    "timestamp": "Nov 6, 2024, 11:07 PM",
+    "timeAgo": "Nov 6, 2024",
+    "views": "2",
+    "picks": "0",
+    "axes": "0",
+    "verified": "gold",
+    "username": "JeffDornik",
+    "displayName": "Jeff Dornik"
+   },
+   "render": {
+    "ok": true,
+    "dimensions": "2400x2464",
+    "failedImages": [],
+    "errors": [],
+    "notes": "videoThumbUsed=False; linkCardRendered=False",
+    "anomalies": []
+   },
+   "verdict": "broken",
+   "specifics": "GAP1 CONFIRMED: same as 2500 - 1a-1791.com thumbnail in page, thumbnail=null. No linkCard (post.link null)."
+  },
+  {
+   "url": "https://pickax.com/post/4500",
+   "type": "article",
+   "source": "historical",
+   "extraction": {
+    "video": null,
+    "thumbnail": null,
+    "avatar": "PRESENT",
+    "images": 1,
+    "linkCard": {
+     "url": "https://www.ft.com/content/9ebb3fc3-11a9-4dc5-a1a3-381c5426f93a?utm_source=chatgpt.com",
+     "domain": "ft.com",
+     "title": "Blackstone-owned events organiser Clarion plans acquisition ",
+     "image": "PRESENT",
+     "description": "Trade fair group looks to double revenue as private equity b"
+    },
+    "quoted": null,
+    "title_or_text": "In a world where conformity is the norm, your morning coffee shouldn't be just a",
+    "textLen": 1819,
+    "timestamp": null,
+    "timeAgo": null,
+    "views": null,
+    "picks": "6",
+    "axes": "0",
+    "verified": "blue",
+    "username": "PickaxNews",
+    "displayName": "Pickax News"
+   },
+   "render": {
+    "ok": true,
+    "dimensions": "2400x8787",
+    "failedImages": [],
+    "errors": [],
+    "notes": "videoThumbUsed=False; linkCardRendered=True; imagesRendered=1",
+    "anomalies": []
+   },
+   "verdict": "broken",
+   "specifics": "Article (2024): 1819-char text, .webp image, ft.com card with image all extract; blue badge correct. timestamp/timeAgo/views null (article reading-view markup, no standard byline)."
+  },
+  {
+   "url": "https://pickax.com/post/8000",
+   "type": "image-only",
+   "source": "historical",
+   "extraction": {
+    "video": null,
+    "thumbnail": null,
+    "avatar": "PRESENT",
+    "images": 1,
+    "linkCard": null,
+    "quoted": null,
+    "title_or_text": "",
+    "textLen": 0,
+    "timestamp": "Mar 2, 2025, 1:19 AM",
+    "timeAgo": "Mar 2, 2025",
+    "views": "1",
+    "picks": "0",
+    "axes": "0",
+    "verified": null,
+    "username": "TLA",
+    "displayName": "TLA"
+   },
+   "render": {
+    "ok": true,
+    "dimensions": "2400x2384",
+    "failedImages": [],
+    "errors": [],
+    "notes": "videoThumbUsed=False; linkCardRendered=False; imagesRendered=1",
+    "anomalies": []
+   },
+   "verdict": "works",
+   "specifics": "Image-only post, empty text: image extracted, text empty, no errors; renders 2400x2384."
+  },
+  {
+   "url": "https://pickax.com/post/10000",
+   "type": "quote",
+   "source": "historical",
+   "extraction": {
+    "video": null,
+    "thumbnail": null,
+    "avatar": "PRESENT",
+    "images": 0,
+    "linkCard": null,
+    "quoted": {
+     "postId": "9999",
+     "username": "RachelAlexander",
+     "textLen": 0
+    },
+    "title_or_text": "Representative Abe Hamadeh (R-AZ-08) recently introduced The VOTE Act \u2014 Voting O",
+    "textLen": 375,
+    "timestamp": "Apr 4, 2025, 7:19 PM",
+    "timeAgo": "Apr 4, 2025",
+    "views": "13",
+    "picks": "1",
+    "axes": "0",
+    "verified": "blue",
+    "username": "RachelAlexander",
+    "displayName": "Rachel Alexander"
+   },
+   "render": {
+    "ok": true,
+    "dimensions": "2400x2396",
+    "failedImages": [],
+    "errors": [],
+    "notes": "videoThumbUsed=False; linkCardRendered=False",
+    "anomalies": []
+   },
+   "verdict": "works",
+   "specifics": "Quote post, blue badge: quoted chain extracts; renders."
+  },
+  {
+   "url": "https://pickax.com/post/45921",
+   "type": "youtube-embed",
+   "source": "special-hunt",
+   "extraction": {
+    "video": {
+     "src": "https://rumble.com/embed/v6s5zd9/",
+     "title": "X and Facebook Are Silently Censoring You While Pretending to Support Free Speech and Expression",
+     "thumbnail": null
+    },
+    "thumbnail": null,
+    "avatar": "PRESENT",
+    "images": 1,
+    "linkCard": null,
+    "quoted": null,
+    "title_or_text": "In 1776, our Founding Fathers declared independence, not just from a tyrant acro",
+    "textLen": 4065,
+    "timestamp": null,
+    "timeAgo": null,
+    "views": null,
+    "picks": "1",
+    "axes": "0",
+    "verified": "gold",
+    "username": "JeffDornik",
+    "displayName": "Jeff Dornik"
+   },
+   "render": {
+    "ok": true,
+    "dimensions": "2400x14120",
+    "failedImages": [],
+    "errors": [],
+    "notes": "videoThumbUsed=False; linkCardRendered=False; imagesRendered=1",
+    "anomalies": []
+   },
+   "verdict": "broken",
+   "specifics": "Anchor-wrapped YouTube iframe is NOT extracted: the article body contains an earlier Rumble iframe (v6s5zd9) and the extractor takes the first recognized iframe (first-match-wins). Synthetic test proves the anchor wrapping itself extracts fine when the YouTube iframe is first. Rumble thumbnail null because the page carries NO rumble thumbnail URL for v6s5zd9 (genuine missing data). timestamp/timeAgo/views null (article reading view)."
+  },
+  {
+   "url": "https://pickax.com/post/50000",
+   "type": "deleted-post",
+   "source": "historical",
+   "extraction": {
+    "error": "not-found"
+   },
+   "render": {
+    "ok": false,
+    "dimensions": null,
+    "failedImages": [],
+    "errors": [
+     "not-found"
+    ],
+    "notes": null,
+    "anomalies": []
+   },
+   "verdict": "works",
+   "specifics": "Deleted post: HTTP 404 -> worker returns {error:not-found} 404; correctly not renderable. Byte-identical to never-existed 404s."
+  },
+  {
+   "url": "https://pickax.com/post/80000",
+   "type": "rumble-video",
+   "source": "historical",
+   "extraction": {
+    "video": {
+     "src": "https://rumble.com/embed/v6unszm/",
+     "title": "Electing to Work Together \u2013 Guest Steven Stern on Last Call Radio",
+     "thumbnail": null
+    },
+    "thumbnail": null,
+    "avatar": "PRESENT",
+    "images": 0,
+    "linkCard": {
+     "url": "https://rumble.com/v6wup8g-electing-to-work-together-guest-steven-stern-on-last-call-radio.html",
+     "domain": "rumble.com",
+     "title": "Electing to Work Together \u2013 Guest Steven Stern on Last Call ",
+     "image": "EMPTY",
+     "description": ""
+    },
+    "quoted": null,
+    "title_or_text": "Electing to Work Together \u2013 Guest Steven Stern on Last Call Radio",
+    "textLen": 65,
+    "timestamp": "Jul 29, 2025, 6:48 PM",
+    "timeAgo": "Jul 29, 2025",
+    "views": "1",
+    "picks": "0",
+    "axes": "0",
+    "verified": "gold",
+    "username": "SternAmerican",
+    "displayName": "Steve Stern"
+   },
+   "render": {
+    "ok": true,
+    "dimensions": "2400x2584",
+    "failedImages": [],
+    "errors": [],
+    "notes": "videoThumbUsed=False; linkCardRendered=False",
+    "anomalies": []
+   },
+   "verdict": "broken",
+   "specifics": "GAP1 CONFIRMED: Rumble thumbnail on 1a-1791.com (page has full https://1a-1791.com/video/... URL) -> thumbnail=null. GAP3 CONFIRMED: spurious imageless linkCard(rumble.com) alongside video (payload-level; renderer masks it)."
+  },
+  {
+   "url": "https://pickax.com/post/85000",
+   "type": "rumble-video",
+   "source": "historical",
+   "extraction": {
+    "video": {
+     "src": "https://rumble.com/embed/v6vo3g4/",
+     "title": "We Try.......THE FINALS!!",
+     "thumbnail": null
+    },
+    "thumbnail": null,
+    "avatar": "PRESENT",
+    "images": 0,
+    "linkCard": {
+     "url": "https://rumble.com/v6xuzoy-we-try.......the-finals.html",
+     "domain": "rumble.com",
+     "title": "We Try.......THE FINALS!!",
+     "image": "EMPTY",
+     "description": ""
+    },
+    "quoted": null,
+    "title_or_text": "We Try.......THE FINALS!!",
+    "textLen": 25,
+    "timestamp": "Aug 20, 2025, 11:07 PM",
+    "timeAgo": "Aug 20, 2025",
+    "views": null,
+    "picks": "0",
+    "axes": "0",
+    "verified": "gold",
+    "username": "JoeIllyesJr",
+    "displayName": "Joe Illyes Jr"
+   },
+   "render": {
+    "ok": true,
+    "dimensions": "2400x2464",
+    "failedImages": [],
+    "errors": [],
+    "notes": "videoThumbUsed=False; linkCardRendered=False",
+    "anomalies": []
+   },
+   "verdict": "broken",
+   "specifics": "GAP1 CONFIRMED + GAP3 CONFIRMED: same as 80000. views null (countViews=0, element omitted - correct)."
+  },
+  {
+   "url": "https://pickax.com/post/93619",
+   "type": "link-card",
+   "source": "special-hunt",
+   "extraction": {
+    "video": null,
+    "thumbnail": null,
+    "avatar": "PRESENT",
+    "images": 0,
+    "linkCard": {
+     "url": "https://jamesroguski.substack.com/p/the-pabs-negotiations-must-be-stopped",
+     "domain": "jamesroguski.substack.com",
+     "title": "THE PABS NEGOTIATIONS MUST BE STOPPED NOW",
+     "image": "PRESENT",
+     "description": "The WHO/PABS negotiations will resume September 15-19, 2025."
+    },
+    "quoted": null,
+    "title_or_text": "Please take the time to watch the three minute music video and help spread the w",
+    "textLen": 84,
+    "timestamp": "Sep 14, 2025, 5:36 PM",
+    "timeAgo": "Sep 14, 2025",
+    "views": "7",
+    "picks": "7",
+    "axes": "0",
+    "verified": "gold",
+    "username": "JamesRoguski",
+    "displayName": "James Roguski"
+   },
+   "render": {
+    "ok": true,
+    "dimensions": "2400x2878",
+    "failedImages": [],
+    "errors": [],
+    "notes": "videoThumbUsed=False; linkCardRendered=True",
+    "anomalies": []
+   },
+   "verdict": "works",
+   "specifics": "Substack card: full payload link (url/title/description + metadata preview image); renders with preview image."
+  },
+  {
+   "url": "https://pickax.com/post/98902",
+   "type": "link-card",
+   "source": "special-hunt",
+   "extraction": {
+    "video": null,
+    "thumbnail": null,
+    "avatar": "PRESENT",
+    "images": 0,
+    "linkCard": {
+     "url": "https://thegatewaypundit.com/2025/09/breaking-youtube-agrees-pay-president-trump-24-5/",
+     "domain": "thegatewaypundit.com",
+     "title": "BREAKING: YouTube Agrees to Pay President Trump $24.5 Millio",
+     "image": "PRESENT",
+     "description": "\u00a0 \u00a0 \u00a0 \u00a0 \u00a0\u00a0YouTube agreed to pay President Trump a $24.5 mill"
+    },
+    "quoted": null,
+    "title_or_text": "Don't take this the wrong way, I am glad that Peres. Trump won this lawsuit agai",
+    "textLen": 1485,
+    "timestamp": "Sep 30, 2025, 1:41 AM",
+    "timeAgo": "Sep 30, 2025",
+    "views": "1",
+    "picks": "0",
+    "axes": "0",
+    "verified": null,
+    "username": "SammytheSquirrel",
+    "displayName": "Samuel E Roberson Jr"
+   },
+   "render": {
+    "ok": true,
+    "dimensions": "2400x7054",
+    "failedImages": [],
+    "errors": [],
+    "notes": "videoThumbUsed=False; linkCardRendered=True",
+    "anomalies": []
+   },
+   "verdict": "works",
+   "specifics": "Gateway Pundit card: full linkCard with preview image; long text (1485 chars) extracts cleanly."
+  },
+  {
+   "url": "https://pickax.com/post/100000",
+   "type": "link-card",
+   "source": "historical",
+   "extraction": {
+    "video": null,
+    "thumbnail": null,
+    "avatar": "PRESENT",
+    "images": 0,
+    "linkCard": {
+     "url": "https://gatewayhispanic.com/2025/10/breaking-news-elon-musk-just-canceled-his-netflix/",
+     "domain": "gatewayhispanic.com",
+     "title": "BREAKING NEWS: Elon Musk cancels his Netflix subscription an",
+     "image": "PRESENT",
+     "description": "Elon Musk, the visionary behind Tesla and X, has publicly ca"
+    },
+    "quoted": null,
+    "title_or_text": "I canceled my Netflix account right after they came out with the movie \"Cuties\" ",
+    "textLen": 658,
+    "timestamp": "Oct 2, 2025, 1:43 PM",
+    "timeAgo": "Oct 2, 2025",
+    "views": null,
+    "picks": "0",
+    "axes": "0",
+    "verified": null,
+    "username": "SammytheSquirrel",
+    "displayName": "Samuel E Roberson Jr"
+   },
+   "render": {
+    "ok": true,
+    "dimensions": "2400x5014",
+    "failedImages": [],
+    "errors": [],
+    "notes": "videoThumbUsed=False; linkCardRendered=True",
+    "anomalies": []
+   },
+   "verdict": "works",
+   "specifics": "Link-card post: full card with preview image; hashtags/@mentions/br breaks cleaned."
+  },
+  {
+   "url": "https://pickax.com/post/164644",
+   "type": "youtube-embed",
+   "source": "special-hunt",
+   "extraction": {
+    "video": {
+     "src": "https://www.youtube.com/embed/0cId7EN9EJs?feature=oembed",
+     "title": "Why The Jewish Messiah MUST Be Born Of A VIRGIN!",
+     "thumbnail": "PRESENT"
+    },
+    "thumbnail": null,
+    "avatar": "PRESENT",
+    "images": 0,
+    "linkCard": {
+     "url": "https://www.youtube.com/live/0cId7EN9EJs?si=nbupWSy8D1cDeUMX",
+     "domain": "youtube.com",
+     "title": "Why The Jewish Messiah MUST Be Born Of A VIRGIN!",
+     "image": "EMPTY",
+     "description": ""
+    },
+    "quoted": null,
+    "title_or_text": "Video Sermon #kjv #kjb #kingjamesbible #bible #biblestudy #scripture #scriptures",
+    "textLen": 315,
+    "timestamp": "Feb 8, 2026, 8:20 AM",
+    "timeAgo": "Feb 8, 2026",
+    "views": "2",
+    "picks": "0",
+    "axes": "0",
+    "verified": "blue",
+    "username": "jeffhertzog",
+    "displayName": "Jeff Hertzog"
+   },
+   "render": {
+    "ok": true,
+    "dimensions": "2400x3184",
+    "failedImages": [],
+    "errors": [],
+    "notes": "videoThumbUsed=True; linkCardRendered=False",
+    "anomalies": []
+   },
+   "verdict": "works",
+   "specifics": "YouTube Live URL -> oEmbed embed id 0cId7EN9EJs; video+title+thumbnail(i.ytimg.com hqdefault) all extracted. Payload carries spurious imageless linkCard(youtube.com) but renderer suppresses it on video posts."
+  },
+  {
+   "url": "https://pickax.com/post/176163",
+   "type": "spotify-embed",
+   "source": "special-hunt",
+   "extraction": {
+    "video": null,
+    "thumbnail": null,
+    "avatar": "PRESENT",
+    "images": 0,
+    "linkCard": {
+     "url": "https://open.spotify.com/track/12XIpdpgTyoKGe0EInL2Dp?si=44d932473c854164",
+     "domain": "open.spotify.com",
+     "title": "Silent Divide",
+     "image": "EMPTY",
+     "description": ""
+    },
+    "quoted": null,
+    "title_or_text": "I've been really getting into Alter Bridge's music again... love their new singl",
+    "textLen": 146,
+    "timestamp": "Feb 20, 2026, 6:36 PM",
+    "timeAgo": "Feb 20, 2026",
+    "views": "5",
+    "picks": "8",
+    "axes": "0",
+    "verified": "gold",
+    "username": "JeffDornik",
+    "displayName": "Jeff Dornik"
+   },
+   "render": {
+    "ok": true,
+    "dimensions": "2400x1772",
+    "failedImages": [],
+    "errors": [],
+    "notes": "videoThumbUsed=False; linkCardRendered=True",
+    "anomalies": []
+   },
+   "verdict": "broken",
+   "specifics": "SPOTIFY track oEmbed: video=null (open.spotify.com/embed/track iframe not matched). linkCard={url: spotify track URL, title \"Silent Divide\", domain open.spotify.com, imageUrl EMPTY} although oEmbed thumbnail_url exists in page (https://image-cdn-fa.spotifycdn.com/image/ab67616d00001e02...) - never mapped. Renders as text post + imageless link card; no player, no preview image."
+  },
+  {
+   "url": "https://pickax.com/post/260000",
+   "type": "regular-no-avatar",
+   "source": "historical",
+   "extraction": {
+    "video": null,
+    "thumbnail": null,
+    "avatar": null,
+    "images": 0,
+    "linkCard": null,
+    "quoted": null,
+    "title_or_text": "Trailer looks very dark & negative :)\n\nThis summer everything will become clear.",
+    "textLen": 173,
+    "timestamp": null,
+    "timeAgo": null,
+    "views": null,
+    "picks": "0",
+    "axes": "0",
+    "verified": null,
+    "username": "FloatingOnSmiles-Fos",
+    "displayName": "FloatingOnSmiles-Fos Aqui"
+   },
+   "render": {
+    "ok": true,
+    "dimensions": "2400x1806",
+    "failedImages": [],
+    "errors": [],
+    "notes": "videoThumbUsed=False; linkCardRendered=False; avatarPlaceholder=True",
+    "anomalies": []
+   },
+   "verdict": "broken",
+   "specifics": "GAP2 CONFIRMED: hyphenated username @FloatingOnSmiles-Fos -> timestamp/timeAgo null (DOM regex [\\w.] excludes \"-\"). username/displayName saved via payload path; avatarUrl null handled (no avatar img on page, placeholder initial renders). views null (countViews=0, correct)."
+  },
+  {
+   "url": "https://pickax.com/post/300000",
+   "type": "regular",
+   "source": "historical",
+   "extraction": {
+    "video": null,
+    "thumbnail": null,
+    "avatar": "PRESENT",
+    "images": 0,
+    "linkCard": null,
+    "quoted": null,
+    "title_or_text": "Solid. Total knee slapper. \ud83d\ude4c",
+    "textLen": 28,
+    "timestamp": "Apr 26, 2026, 5:15 PM",
+    "timeAgo": "Apr 26, 2026",
+    "views": "2",
+    "picks": "1",
+    "axes": "0",
+    "verified": "gold",
+    "username": "robinraygreen",
+    "displayName": "Robin G \u267e\ufe0f Solving the UnWellness Gap"
+   },
+   "render": {
+    "ok": true,
+    "dimensions": "2400x1134",
+    "failedImages": [],
+    "errors": [],
+    "notes": "videoThumbUsed=False; linkCardRendered=False",
+    "anomalies": []
+   },
+   "verdict": "works",
+   "specifics": "Standard post: all fields extract; renders."
+  },
+  {
+   "url": "https://pickax.com/post/395769",
+   "type": "link-card",
+   "source": "special-hunt",
+   "extraction": {
+    "video": null,
+    "thumbnail": null,
+    "avatar": "PRESENT",
+    "images": 0,
+    "linkCard": {
+     "url": "https://podcasts.apple.com/us/podcast/freedom-first-network/id1733545745",
+     "domain": "podcasts.apple.com",
+     "title": "Freedom First Network",
+     "image": "EMPTY",
+     "description": ""
+    },
+    "quoted": null,
+    "title_or_text": "Catch the latest episodes from Freedom First Network on Apple Podcasts!",
+    "textLen": 71,
+    "timestamp": "Jun 16, 2026, 9:21 PM",
+    "timeAgo": "Jun 16, 2026",
+    "views": "400",
+    "picks": "1",
+    "axes": "0",
+    "verified": "gold",
+    "username": "FreedomFirstNetwork",
+    "displayName": "Freedom First Network"
+   },
+   "render": {
+    "ok": true,
+    "dimensions": "2400x1652",
+    "failedImages": [],
+    "errors": [],
+    "notes": "videoThumbUsed=False; linkCardRendered=True",
+    "anomalies": []
+   },
+   "verdict": "broken",
+   "specifics": "Apple Podcasts SHOW oEmbed: video=null (embed.podcasts.apple.com iframe not matched); linkCard extracted with title+domain but imageUrl EMPTY although the oEmbed carries thumbnail_url (https://is1-ssl.mzstatic.com/...jpg) - never mapped. Card renders domain+title only."
+  },
+  {
+   "url": "https://pickax.com/post/521149",
+   "type": "youtube-embed",
+   "source": "special-hunt",
+   "extraction": {
+    "video": {
+     "src": "https://www.youtube.com/embed/MFflRvcluKg?feature=oembed",
+     "title": "Explore My Comic Book Stash (Including Signed Items) On My Birthday",
+     "thumbnail": "PRESENT"
+    },
+    "thumbnail": null,
+    "avatar": "PRESENT",
+    "images": 1,
+    "linkCard": null,
+    "quoted": null,
+    "title_or_text": "Who is ready to celebrate my birthday? I take a deep dive into my comic book sta",
+    "textLen": 471,
+    "timestamp": null,
+    "timeAgo": null,
+    "views": null,
+    "picks": "0",
+    "axes": "0",
+    "verified": "gold",
+    "username": "realjacobairey",
+    "displayName": "Jacob Airey"
+   },
+   "render": {
+    "ok": true,
+    "dimensions": "2400x5185",
+    "failedImages": [],
+    "errors": [],
+    "notes": "videoThumbUsed=True; linkCardRendered=False; imagesRendered=1",
+    "anomalies": []
+   },
+   "verdict": "broken",
+   "specifics": "Article-INLINE YouTube iframe extracts fine (video+thumbnail). BUT timestamp/timeAgo/views are null: article reading-view markup has no standard byline; fields are DOM-only."
+  },
+  {
+   "url": "https://pickax.com/post/600000",
+   "type": "link-card",
+   "source": "historical",
+   "extraction": {
+    "video": null,
+    "thumbnail": null,
+    "avatar": "PRESENT",
+    "images": 0,
+    "linkCard": {
+     "url": "https://www.disneyfoodblog.com/2026/09/05/2-epcot-food-wine-festival-booths-open-this-month/",
+     "domain": "disneyfoodblog.com",
+     "title": "2 EPCOT Food & Wine Festival Booths Open THIS MONTH | the di",
+     "image": "PRESENT",
+     "description": "These two EPCOT Food and Wine Festival booths are opening TH"
+    },
+    "quoted": null,
+    "title_or_text": "These two EPCOT Food and Wine Festival booths are opening THIS month!",
+    "textLen": 69,
+    "timestamp": "Sep 5, 2026, 3:02 PM",
+    "timeAgo": "Sep 5, 2026",
+    "views": null,
+    "picks": "0",
+    "axes": "0",
+    "verified": "gold",
+    "username": "DisneyFoodBlog",
+    "displayName": "Disney Food Blog"
+   },
+   "render": {
+    "ok": true,
+    "dimensions": "2400x2998",
+    "failedImages": [],
+    "errors": [],
+    "notes": "videoThumbUsed=False; linkCardRendered=True",
+    "anomalies": []
+   },
+   "verdict": "works",
+   "specifics": "Link-card post: full card with preview image; renders."
+  },
+  {
+   "url": "https://pickax.com/post/650000",
+   "type": "rumble-video",
+   "source": "historical",
+   "extraction": {
+    "video": {
+     "src": "https://rumble.com/embed/v7dbbfk/",
+     "title": "Trump, the Irish Nationalist | DeProgram with Ted Rall and Jamarl Thomas",
+     "thumbnail": "PRESENT"
+    },
+    "thumbnail": null,
+    "avatar": "PRESENT",
+    "images": 0,
+    "linkCard": {
+     "url": "https://rumble.com/v7fhod2-trump-the-irish-nationalist-deprogram-with-ted-rall-and-jamarl-thomas.html?e9s=src_v1_cllr",
+     "domain": "rumble.com",
+     "title": "Trump, the Irish Nationalist | DeProgram with Ted Rall and J",
+     "image": "EMPTY",
+     "description": ""
+    },
+    "quoted": null,
+    "title_or_text": "DeProgram is LIVE!!",
+    "textLen": 19,
+    "timestamp": "Sep 14, 2026, 1:34 PM",
+    "timeAgo": "Sep 14, 2026",
+    "views": "6",
+    "picks": "0",
+    "axes": "0",
+    "verified": "gold",
+    "username": "Robby",
+    "displayName": "Robby"
+   },
+   "render": {
+    "ok": true,
+    "dimensions": "2400x2464",
+    "failedImages": [],
+    "errors": [],
+    "notes": "videoThumbUsed=True; linkCardRendered=False",
+    "anomalies": []
+   },
+   "verdict": "broken",
+   "specifics": "GAP3 CONFIRMED (current-era): Rumble video + spurious imageless linkCard(rumble.com) in payload (masked by renderer). Video thumbnail extracts fine via *.cdn.rumble.cloud literal."
+  },
+  {
+   "url": "https://pickax.com/post/713099",
+   "type": "article",
+   "source": "special-hunt",
+   "extraction": {
+    "video": null,
+    "thumbnail": null,
+    "avatar": "PRESENT",
+    "images": 1,
+    "linkCard": null,
+    "quoted": null,
+    "title_or_text": "\"DONORCLASS\"\nHouse Minority Leader Hakeem Jeffries is \"owndedbyisntreal\"...BTW..",
+    "textLen": 6777,
+    "timestamp": null,
+    "timeAgo": null,
+    "views": null,
+    "picks": "0",
+    "axes": "0",
+    "verified": null,
+    "username": "stonedtrader",
+    "displayName": "Steph Salah"
+   },
+   "render": {
+    "ok": true,
+    "dimensions": "1992x16383",
+    "failedImages": [],
+    "errors": [],
+    "notes": "videoThumbUsed=False; linkCardRendered=False; imagesRendered=1",
+    "anomalies": []
+   },
+   "verdict": "broken",
+   "specifics": "Article extracts (6777 chars) and renders (downscaled 1992x16383 by 16384px cap); timestamp/timeAgo/views null (article reading-view markup)."
+  },
+  {
+   "url": "https://pickax.com/post/723242",
+   "type": "article",
+   "source": "special-hunt",
+   "extraction": {
+    "video": null,
+    "thumbnail": null,
+    "avatar": "PRESENT",
+    "images": 1,
+    "linkCard": null,
+    "quoted": null,
+    "title_or_text": "These are my sons when they were very little.  They are now in their mid 40's.  ",
+    "textLen": 3289,
+    "timestamp": null,
+    "timeAgo": null,
+    "views": null,
+    "picks": "1",
+    "axes": "0",
+    "verified": null,
+    "username": "OliverDangerclaws",
+    "displayName": "Deb"
+   },
+   "render": {
+    "ok": true,
+    "dimensions": "2400x10150",
+    "failedImages": [],
+    "errors": [],
+    "notes": "videoThumbUsed=False; linkCardRendered=False; imagesRendered=1",
+    "anomalies": []
+   },
+   "verdict": "broken",
+   "specifics": "Article by unverified author extracts fine (text, image, verified:null), renders; but timestamp/timeAgo/views null (article reading-view markup)."
+  },
+  {
+   "url": "https://pickax.com/post/726967",
+   "type": "link-card",
+   "source": "special-hunt",
+   "extraction": {
+    "video": null,
+    "thumbnail": null,
+    "avatar": "PRESENT",
+    "images": 0,
+    "linkCard": {
+     "url": "https://www.usatoday.com/story/news/politics/2026/09/21/trump-ban-cnn-networks-suspend-white-house-pool/91872001007/",
+     "domain": "usatoday.com",
+     "title": "Major TV networks pull out of White House pool after Trump b",
+     "image": "EMPTY",
+     "description": ""
+    },
+    "quoted": null,
+    "title_or_text": "So FoxNews will no longer travel with the President. The MSM always sticks toget",
+    "textLen": 167,
+    "timestamp": "Sep 21, 2026, 5:43 PM",
+    "timeAgo": "3 days ago",
+    "views": "11",
+    "picks": "2",
+    "axes": "0",
+    "verified": "gold",
+    "username": "BeardedBenPA",
+    "displayName": "Ben Hostetter"
+   },
+   "render": {
+    "ok": true,
+    "dimensions": "2400x2012",
+    "failedImages": [],
+    "errors": [],
+    "notes": "videoThumbUsed=False; linkCardRendered=True",
+    "anomalies": []
+   },
+   "verdict": "works",
+   "specifics": "USA Today card: title extracted; imageUrl EMPTY in Pickax data (faithful - page has no metadata image for this share); renders domain+title only."
+  },
+  {
+   "url": "https://pickax.com/post/738137",
+   "type": "link-card",
+   "source": "special-hunt",
+   "extraction": {
+    "video": null,
+    "thumbnail": null,
+    "avatar": "PRESENT",
+    "images": 0,
+    "linkCard": {
+     "url": "https://youtu.be/whR87AXHyQs?si=3bVFOZ5l7TPVSsnB",
+     "domain": "youtu.be",
+     "title": " - YouTube",
+     "image": "EMPTY",
+     "description": "Enjoy the videos and music you love, upload original content"
+    },
+    "quoted": null,
+    "title_or_text": "New here, so hello! I\u2019m Will from PLH Studio. I make short films, music, and wha",
+    "textLen": 294,
+    "timestamp": "Sep 22, 2026, 9:48 PM",
+    "timeAgo": "2 days ago",
+    "views": "21",
+    "picks": "1",
+    "axes": "0",
+    "verified": null,
+    "username": "PLH_Studio",
+    "displayName": "William Aniello"
+   },
+   "render": {
+    "ok": true,
+    "dimensions": "2400x2444",
+    "failedImages": [],
+    "errors": [],
+    "notes": "videoThumbUsed=False; linkCardRendered=True",
+    "anomalies": []
+   },
+   "verdict": "works",
+   "specifics": "youtu.be short link -> plain OG link card, NO oEmbed, video=null (confirms fixture note). Title \" - YouTube\" and empty imageUrl are Pickax own stored data, reproduced faithfully."
+  },
+  {
+   "url": "https://pickax.com/post/739931",
+   "type": "spotify-embed",
+   "source": "special-hunt",
+   "extraction": {
+    "video": null,
+    "thumbnail": null,
+    "avatar": "PRESENT",
+    "images": 0,
+    "linkCard": {
+     "url": "https://open.spotify.com/artist/0Al79swiK9ABoIf4dsdVSg?si=BxYVd0RuTcC_3nt0yIwyAw",
+     "domain": "open.spotify.com",
+     "title": "KTMA Productions",
+     "image": "EMPTY",
+     "description": ""
+    },
+    "quoted": null,
+    "title_or_text": "my name is key, im 23, i love sports, & most importantly im a music producer \ud83d\udd25\n\n",
+    "textLen": 118,
+    "timestamp": "Sep 23, 2026, 12:37 AM",
+    "timeAgo": "1 day ago",
+    "views": "3",
+    "picks": "1",
+    "axes": "0",
+    "verified": null,
+    "username": "keyfromdamitten",
+    "displayName": "key"
+   },
+   "render": {
+    "ok": true,
+    "dimensions": "2400x1868",
+    "failedImages": [],
+    "errors": [],
+    "notes": "videoThumbUsed=False; linkCardRendered=True",
+    "anomalies": []
+   },
+   "verdict": "broken",
+   "specifics": "SPOTIFY artist-page oEmbed: same as 176163 (title \"KTMA Productions\", thumbnail_url https://image-cdn-fa.spotifycdn.com/image/ab67616100005174... unused)."
+  },
+  {
+   "url": "https://pickax.com/post/741776",
+   "type": "native-video",
+   "source": "special-hunt",
+   "extraction": {
+    "video": null,
+    "thumbnail": null,
+    "avatar": "PRESENT",
+    "images": 0,
+    "linkCard": null,
+    "quoted": null,
+    "title_or_text": "Inspired by a post made a few days ago by @K9Dirk I made this. And with some adv",
+    "textLen": 249,
+    "timestamp": "Sep 23, 2026, 4:34 AM",
+    "timeAgo": "1 day ago",
+    "views": "123",
+    "picks": "35",
+    "axes": "1",
+    "verified": "gold",
+    "username": "Erin",
+    "displayName": "Erin Pinson"
+   },
+   "render": {
+    "ok": true,
+    "dimensions": "2400x1830",
+    "failedImages": [],
+    "errors": [],
+    "notes": "videoThumbUsed=False; linkCardRendered=False",
+    "anomalies": []
+   },
+   "verdict": "broken",
+   "specifics": "NATIVE VIDEO unhandled: same as 756851 (480x854, 30.0s). video=null -> text-only render."
+  },
+  {
+   "url": "https://pickax.com/post/748462",
+   "type": "link-card",
+   "source": "special-hunt",
+   "extraction": {
+    "video": null,
+    "thumbnail": null,
+    "avatar": "PRESENT",
+    "images": 0,
+    "linkCard": {
+     "url": "https://podcasts.apple.com/us/podcast/heroism-on-display-marine-leaps-into-action-to-rescue/id1512805826?i=1000789841144",
+     "domain": "podcasts.apple.com",
+     "title": "The Counter Culture Mom Show with Tina Griffin",
+     "image": "EMPTY",
+     "description": ""
+    },
+    "quoted": null,
+    "title_or_text": "I rarely do interviews these days, but I will when the subject is important to m",
+    "textLen": 187,
+    "timestamp": "Sep 23, 2026, 9:48 PM",
+    "timeAgo": "1 day ago",
+    "views": "118",
+    "picks": "2",
+    "axes": "0",
+    "verified": "blue",
+    "username": "RealJasonNelson",
+    "displayName": "Jason Nelson"
+   },
+   "render": {
+    "ok": true,
+    "dimensions": "2400x2108",
+    "failedImages": [],
+    "errors": [],
+    "notes": "videoThumbUsed=False; linkCardRendered=True",
+    "anomalies": []
+   },
+   "verdict": "broken",
+   "specifics": "Apple Podcasts EPISODE oEmbed: same as 395769 - video=null, linkCard title+domain extracted, preview image (oEmbed thumbnail_url) dropped."
+  },
+  {
+   "url": "https://pickax.com/post/749396",
+   "type": "youtube-embed",
+   "source": "special-hunt",
+   "extraction": {
+    "video": {
+     "src": "https://www.youtube.com/embed/nabCQjuvJzc?start=4&feature=oembed",
+     "title": "The Real Heroes of Sound of Freedom: The People Who Risk Everything to Save Lives",
+     "thumbnail": "PRESENT"
+    },
+    "thumbnail": null,
+    "avatar": "PRESENT",
+    "images": 0,
+    "linkCard": {
+     "url": "https://www.youtube.com/watch?v=nabCQjuvJzc&t=4s",
+     "domain": "youtube.com",
+     "title": "The Real Heroes of Sound of Freedom: The People Who Risk Eve",
+     "image": "EMPTY",
+     "description": ""
+    },
+    "quoted": null,
+    "title_or_text": "I want to share a podcast interview I did with my wife. Plus I want to spread th",
+    "textLen": 130,
+    "timestamp": "Sep 23, 2026, 11:26 PM",
+    "timeAgo": "22 hours ago",
+    "views": "36",
+    "picks": "3",
+    "axes": "0",
+    "verified": null,
+    "username": "HanselOrzame",
+    "displayName": "Hansel Orzame"
+   },
+   "render": {
+    "ok": true,
+    "dimensions": "2400x2704",
+    "failedImages": [],
+    "errors": [],
+    "notes": "videoThumbUsed=True; linkCardRendered=False",
+    "anomalies": []
+   },
+   "verdict": "works",
+   "specifics": "Timestamped watch URL preserved as embed ?start=4; video+thumbnail extracted; thumbnail verified downloadable. Spurious imageless linkCard masked by renderer."
+  },
+  {
+   "url": "https://pickax.com/post/749775",
+   "type": "link-card",
+   "source": "special-hunt",
+   "extraction": {
+    "video": null,
+    "thumbnail": null,
+    "avatar": "PRESENT",
+    "images": 0,
+    "linkCard": {
+     "url": "https://www.louderwithcrowder.com/flock-camera-false-claims",
+     "domain": "louderwithcrowder.com",
+     "title": "Watch: They placed a woman in solitary confinement for a cri",
+     "image": "PRESENT",
+     "description": "A woman was placed in solitary confinement for a crime she d"
+    },
+    "quoted": null,
+    "title_or_text": "Watch Louder with Crowder every weekday at 11:00 AM Eastern, only on Rumble Prem",
+    "textLen": 900,
+    "timestamp": "Sep 24, 2026, 12:02 AM",
+    "timeAgo": "22 hours ago",
+    "views": "8",
+    "picks": "2",
+    "axes": "0",
+    "verified": "gold",
+    "username": "SCrowder",
+    "displayName": "Steven Crowder"
+   },
+   "render": {
+    "ok": true,
+    "dimensions": "2400x5158",
+    "failedImages": [],
+    "errors": [],
+    "notes": "videoThumbUsed=False; linkCardRendered=True",
+    "anomalies": []
+   },
+   "verdict": "works",
+   "specifics": "LouderWithCrowder card: full linkCard with preview image; renders."
+  },
+  {
+   "url": "https://pickax.com/post/750000",
+   "type": "regular",
+   "source": "historical",
+   "extraction": {
+    "video": null,
+    "thumbnail": null,
+    "avatar": "PRESENT",
+    "images": 0,
+    "linkCard": null,
+    "quoted": null,
+    "title_or_text": "Right season 51! Lmao! I quit watching a few years ago, but picked it back up fo",
+    "textLen": 103,
+    "timestamp": "Sep 24, 2026, 12:25 AM",
+    "timeAgo": "22 hours ago",
+    "views": "29",
+    "picks": "0",
+    "axes": "0",
+    "verified": "gold",
+    "username": "MrDInKansas",
+    "displayName": "MrDInKansas"
+   },
+   "render": {
+    "ok": true,
+    "dimensions": "2400x1254",
+    "failedImages": [],
+    "errors": [],
+    "notes": "videoThumbUsed=False; linkCardRendered=False",
+    "anomalies": []
+   },
+   "verdict": "works",
+   "specifics": "Current baseline: all fields extract; renders."
+  },
+  {
+   "url": "https://pickax.com/post/752979",
+   "type": "article",
+   "source": "special-hunt",
+   "extraction": {
+    "video": null,
+    "thumbnail": null,
+    "avatar": "PRESENT",
+    "images": 1,
+    "linkCard": null,
+    "quoted": null,
+    "title_or_text": "Starting next Thursday, Pickax Subscribers will catch Episode I of the next inst",
+    "textLen": 6808,
+    "timestamp": null,
+    "timeAgo": null,
+    "views": null,
+    "picks": "2",
+    "axes": "0",
+    "verified": "gold",
+    "username": "tcmarti427",
+    "displayName": "TC Marti"
+   },
+   "render": {
+    "ok": true,
+    "dimensions": "1922x16384",
+    "failedImages": [],
+    "errors": [],
+    "notes": "videoThumbUsed=False; linkCardRendered=False; imagesRendered=1",
+    "anomalies": []
+   },
+   "verdict": "broken",
+   "specifics": "Article extracts (6808-char text, 1 image) and renders (downscaled to 1922x16384 by the 16384px cap), but timestamp/timeAgo/views null (article reading-view lacks standard byline)."
+  },
+  {
+   "url": "https://pickax.com/post/753756",
+   "type": "native-video",
+   "source": "special-hunt",
+   "extraction": {
+    "video": null,
+    "thumbnail": null,
+    "avatar": "PRESENT",
+    "images": 0,
+    "linkCard": null,
+    "quoted": null,
+    "title_or_text": "Happy Thursday everyone \ud83d\udc4a\ud83d\ude03\n\nWho\u2019s ready for the weekend? \ud83d\ude4c",
+    "textLen": 58,
+    "timestamp": "Sep 24, 2026, 12:20 PM",
+    "timeAgo": "10 hours ago",
+    "views": "50",
+    "picks": "15",
+    "axes": "0",
+    "verified": "gold",
+    "username": "kellikayk",
+    "displayName": "Kelli Kay"
+   },
+   "render": {
+    "ok": true,
+    "dimensions": "2400x1350",
+    "failedImages": [],
+    "errors": [],
+    "notes": "videoThumbUsed=False; linkCardRendered=False",
+    "anomalies": []
+   },
+   "verdict": "broken",
+   "specifics": "NATIVE VIDEO unhandled: same as 756851 (1280x1152 non-16:9, 10.0s). video=null -> text-only render."
+  },
+  {
+   "url": "https://pickax.com/post/755772",
+   "type": "native-video",
+   "source": "special-hunt",
+   "extraction": {
+    "video": null,
+    "thumbnail": null,
+    "avatar": "PRESENT",
+    "images": 0,
+    "linkCard": null,
+    "quoted": null,
+    "title_or_text": "Maggie Moo has been under our care for a week and she\u2019s still alive! The flesh e",
+    "textLen": 738,
+    "timestamp": "Sep 24, 2026, 4:14 PM",
+    "timeAgo": "6 hours ago",
+    "views": "15",
+    "picks": "9",
+    "axes": "0",
+    "verified": "blue",
+    "username": "delmarvafarmwife",
+    "displayName": "Eliza Parker"
+   },
+   "render": {
+    "ok": true,
+    "dimensions": "2400x2814",
+    "failedImages": [],
+    "errors": [],
+    "notes": "videoThumbUsed=False; linkCardRendered=False",
+    "anomalies": []
+   },
+   "verdict": "broken",
+   "specifics": "NATIVE VIDEO unhandled: same as 756851 (720x1280, 41.7s). video=null -> text-only render."
+  },
+  {
+   "url": "https://pickax.com/post/756851",
+   "type": "native-video",
+   "source": "special-hunt",
+   "extraction": {
+    "video": null,
+    "thumbnail": null,
+    "avatar": "PRESENT",
+    "images": 0,
+    "linkCard": null,
+    "quoted": null,
+    "title_or_text": "I don't know if any of you have driven through Kansas to Oklahoma on I35, but th",
+    "textLen": 182,
+    "timestamp": "Sep 24, 2026, 5:55 PM",
+    "timeAgo": "4 hours ago",
+    "views": "61",
+    "picks": "18",
+    "axes": "0",
+    "verified": "gold",
+    "username": "Denosko1",
+    "displayName": "Mrs D"
+   },
+   "render": {
+    "ok": true,
+    "dimensions": "2400x1710",
+    "failedImages": [],
+    "errors": [],
+    "notes": "videoThumbUsed=False; linkCardRendered=False",
+    "anomalies": []
+   },
+   "verdict": "broken",
+   "specifics": "NATIVE VIDEO unhandled: post.videos[] payload (preview user-75839/video-14136/...jpeg 1080x1691, 720x1280, 38.233s) is ignored by worker+nuxtPost; video=null, images=[] -> renders as text-only post, video silently dropped."
+  },
+  {
+   "url": "https://pickax.com/post/757040",
+   "type": "native-video",
+   "source": "special-hunt",
+   "extraction": {
+    "video": null,
+    "thumbnail": null,
+    "avatar": "PRESENT",
+    "images": 0,
+    "linkCard": null,
+    "quoted": null,
+    "title_or_text": "She loves me.",
+    "textLen": 13,
+    "timestamp": "Sep 24, 2026, 6:13 PM",
+    "timeAgo": "4 hours ago",
+    "views": "43",
+    "picks": "13",
+    "axes": "0",
+    "verified": "gold",
+    "username": "vness",
+    "displayName": "Vness, Dutch Mermaid"
+   },
+   "render": {
+    "ok": true,
+    "dimensions": "2400x1134",
+    "failedImages": [],
+    "errors": [],
+    "notes": "videoThumbUsed=False; linkCardRendered=False",
+    "anomalies": []
+   },
+   "verdict": "broken",
+   "specifics": "NATIVE VIDEO unhandled: same as 756851 (1080x1920, 7.5s). video=null -> text-only render."
+  },
+  {
+   "url": "https://pickax.com/post/758588",
+   "type": "youtube-embed",
+   "source": "user-baseline",
+   "extraction": {
+    "video": {
+     "src": "https://www.youtube.com/embed/il-yOatidYE?feature=oembed",
+     "title": "Professional Slop Dealers are Taking Over the Internet",
+     "thumbnail": "PRESENT"
+    },
+    "thumbnail": null,
+    "avatar": "PRESENT",
+    "images": 0,
+    "linkCard": {
+     "url": "https://www.youtube.com/watch?v=il-yOatidYE",
+     "domain": "youtube.com",
+     "title": "Professional Slop Dealers are Taking Over the Internet",
+     "image": "EMPTY",
+     "description": ""
+    },
+    "quoted": null,
+    "title_or_text": "Professional Slop Dealers are Taking Over Content Creation",
+    "textLen": 58,
+    "timestamp": "Sep 24, 2026, 9:07 PM",
+    "timeAgo": "1 hour ago",
+    "views": "16",
+    "picks": "1",
+    "axes": "0",
+    "verified": "gold",
+    "username": "MasteringRumble",
+    "displayName": "Mastering Rumble"
+   },
+   "render": {
+    "ok": true,
+    "dimensions": "2400x2584",
+    "failedImages": [],
+    "errors": [],
+    "notes": "videoThumbUsed=True; linkCardRendered=False",
+    "anomalies": []
+   },
+   "verdict": "works",
+   "specifics": "User baseline YouTube embed: video+title+thumbnail all correct; render 2400x2584 with thumbnail placeholder player."
+  },
+  {
+   "url": "https://pickax.com/post/759176",
+   "type": "link-card",
+   "source": "special-hunt",
+   "extraction": {
+    "video": null,
+    "thumbnail": null,
+    "avatar": "PRESENT",
+    "images": 0,
+    "linkCard": {
+     "url": "https://www.breitbart.com/immigration/2026/09/24/latino-power-rep-demands-ice-be-abolished/",
+     "domain": "breitbart.com",
+     "title": "'Latino Power': Rep. Delia Ramirez Wants to Abolish DHS, Cre",
+     "image": "PRESENT",
+     "description": "The daughter of two illegal migrants is touting \"Latino Powe"
+    },
+    "quoted": null,
+    "title_or_text": "The elected daughter of two illegal migrants is touting \"Latino Power\" as she de",
+    "textLen": 331,
+    "timestamp": "Sep 24, 2026, 10:02 PM",
+    "timeAgo": "24 minutes ago",
+    "views": null,
+    "picks": "0",
+    "axes": "0",
+    "verified": "gold",
+    "username": "BreitbartNews",
+    "displayName": "Breitbart News"
+   },
+   "render": {
+    "ok": true,
+    "dimensions": "2400x3718",
+    "failedImages": [],
+    "errors": [],
+    "notes": "videoThumbUsed=False; linkCardRendered=True",
+    "anomalies": []
+   },
+   "verdict": "works",
+   "specifics": "Breitbart card: title+description+preview image extracted; renders. views null (countViews=0 -> element omitted, correct)."
+  }
+ ],
+ "summary": {
+  "total": 42,
+  "works": 19,
+  "broken": 23,
+  "broken_list": [
+   {
+    "url": "https://pickax.com/post/99",
+    "type": "article",
+    "issue": "Article (2024): 3393-char text + weird-filename image (space + U+202F) extracted; image URL encoded and downloaded fine. timestamp/timeAgo/views null - this is an ARTICLE reading-view page (no standard byline), same markup gap as other articles."
+   },
+   {
+    "url": "https://pickax.com/post/2500",
+    "type": "rumble-video",
+    "issue": "GAP1 CONFIRMED: old Rumble post, video.thumbnail=null although page literally contains https://1a-1791.com/video/...jpg - extractor regex only matches *.cdn.rumble.cloud and cannot resolve devalue slot references. Video renders as dark placeholder. No linkCard (post.link null, correct for this era)."
+   },
+   {
+    "url": "https://pickax.com/post/3000",
+    "type": "youtube-video",
+    "issue": "2024 YouTube video: video+thumbnail extract fine (proves YouTube support predates the new fix). Spurious imageless linkCard(youtube.com) in payload (oEmbed attached to post.link); masked by renderer on video posts."
+   },
+   {
+    "url": "https://pickax.com/post/3500",
+    "type": "rumble-video",
+    "issue": "GAP1 CONFIRMED: same as 2500 - 1a-1791.com thumbnail in page, thumbnail=null. No linkCard (post.link null)."
+   },
+   {
+    "url": "https://pickax.com/post/4500",
+    "type": "article",
+    "issue": "Article (2024): 1819-char text, .webp image, ft.com card with image all extract; blue badge correct. timestamp/timeAgo/views null (article reading-view markup, no standard byline)."
+   },
+   {
+    "url": "https://pickax.com/post/45921",
+    "type": "youtube-embed",
+    "issue": "Anchor-wrapped YouTube iframe is NOT extracted: the article body contains an earlier Rumble iframe (v6s5zd9) and the extractor takes the first recognized iframe (first-match-wins). Synthetic test proves the anchor wrapping itself extracts fine when the YouTube iframe is first. Rumble thumbnail null because the page carries NO rumble thumbnail URL for v6s5zd9 (genuine missing data). timestamp/timeAgo/views null (article reading view)."
+   },
+   {
+    "url": "https://pickax.com/post/80000",
+    "type": "rumble-video",
+    "issue": "GAP1 CONFIRMED: Rumble thumbnail on 1a-1791.com (page has full https://1a-1791.com/video/... URL) -> thumbnail=null. GAP3 CONFIRMED: spurious imageless linkCard(rumble.com) alongside video (payload-level; renderer masks it)."
+   },
+   {
+    "url": "https://pickax.com/post/85000",
+    "type": "rumble-video",
+    "issue": "GAP1 CONFIRMED + GAP3 CONFIRMED: same as 80000. views null (countViews=0, element omitted - correct)."
+   },
+   {
+    "url": "https://pickax.com/post/176163",
+    "type": "spotify-embed",
+    "issue": "SPOTIFY track oEmbed: video=null (open.spotify.com/embed/track iframe not matched). linkCard={url: spotify track URL, title \"Silent Divide\", domain open.spotify.com, imageUrl EMPTY} although oEmbed thumbnail_url exists in page (https://image-cdn-fa.spotifycdn.com/image/ab67616d00001e02...) - never mapped. Renders as text post + imageless link card; no player, no preview image."
+   },
+   {
+    "url": "https://pickax.com/post/260000",
+    "type": "regular-no-avatar",
+    "issue": "GAP2 CONFIRMED: hyphenated username @FloatingOnSmiles-Fos -> timestamp/timeAgo null (DOM regex [\\w.] excludes \"-\"). username/displayName saved via payload path; avatarUrl null handled (no avatar img on page, placeholder initial renders). views null (countViews=0, correct)."
+   },
+   {
+    "url": "https://pickax.com/post/395769",
+    "type": "link-card",
+    "issue": "Apple Podcasts SHOW oEmbed: video=null (embed.podcasts.apple.com iframe not matched); linkCard extracted with title+domain but imageUrl EMPTY although the oEmbed carries thumbnail_url (https://is1-ssl.mzstatic.com/...jpg) - never mapped. Card renders domain+title only."
+   },
+   {
+    "url": "https://pickax.com/post/521149",
+    "type": "youtube-embed",
+    "issue": "Article-INLINE YouTube iframe extracts fine (video+thumbnail). BUT timestamp/timeAgo/views are null: article reading-view markup has no standard byline; fields are DOM-only."
+   },
+   {
+    "url": "https://pickax.com/post/650000",
+    "type": "rumble-video",
+    "issue": "GAP3 CONFIRMED (current-era): Rumble video + spurious imageless linkCard(rumble.com) in payload (masked by renderer). Video thumbnail extracts fine via *.cdn.rumble.cloud literal."
+   },
+   {
+    "url": "https://pickax.com/post/713099",
+    "type": "article",
+    "issue": "Article extracts (6777 chars) and renders (downscaled 1992x16383 by 16384px cap); timestamp/timeAgo/views null (article reading-view markup)."
+   },
+   {
+    "url": "https://pickax.com/post/723242",
+    "type": "article",
+    "issue": "Article by unverified author extracts fine (text, image, verified:null), renders; but timestamp/timeAgo/views null (article reading-view markup)."
+   },
+   {
+    "url": "https://pickax.com/post/739931",
+    "type": "spotify-embed",
+    "issue": "SPOTIFY artist-page oEmbed: same as 176163 (title \"KTMA Productions\", thumbnail_url https://image-cdn-fa.spotifycdn.com/image/ab67616100005174... unused)."
+   },
+   {
+    "url": "https://pickax.com/post/741776",
+    "type": "native-video",
+    "issue": "NATIVE VIDEO unhandled: same as 756851 (480x854, 30.0s). video=null -> text-only render."
+   },
+   {
+    "url": "https://pickax.com/post/748462",
+    "type": "link-card",
+    "issue": "Apple Podcasts EPISODE oEmbed: same as 395769 - video=null, linkCard title+domain extracted, preview image (oEmbed thumbnail_url) dropped."
+   },
+   {
+    "url": "https://pickax.com/post/752979",
+    "type": "article",
+    "issue": "Article extracts (6808-char text, 1 image) and renders (downscaled to 1922x16384 by the 16384px cap), but timestamp/timeAgo/views null (article reading-view lacks standard byline)."
+   },
+   {
+    "url": "https://pickax.com/post/753756",
+    "type": "native-video",
+    "issue": "NATIVE VIDEO unhandled: same as 756851 (1280x1152 non-16:9, 10.0s). video=null -> text-only render."
+   },
+   {
+    "url": "https://pickax.com/post/755772",
+    "type": "native-video",
+    "issue": "NATIVE VIDEO unhandled: same as 756851 (720x1280, 41.7s). video=null -> text-only render."
+   },
+   {
+    "url": "https://pickax.com/post/756851",
+    "type": "native-video",
+    "issue": "NATIVE VIDEO unhandled: post.videos[] payload (preview user-75839/video-14136/...jpeg 1080x1691, 720x1280, 38.233s) is ignored by worker+nuxtPost; video=null, images=[] -> renders as text-only post, video silently dropped."
+   },
+   {
+    "url": "https://pickax.com/post/757040",
+    "type": "native-video",
+    "issue": "NATIVE VIDEO unhandled: same as 756851 (1080x1920, 7.5s). video=null -> text-only render."
+   }
+  ],
+  "method": "Worker /post extraction (worker/src/index.ts at commit 4ffb053 incl. YouTube fix) run in Node against curl-fetched logged-out HTML (2026-09-24); render via src/renderer.ts renderPostImage with stubbed canvas + real image dimensions (PIL) and real downloaded bytes. No sign-in. No code changed."
+ }
+}

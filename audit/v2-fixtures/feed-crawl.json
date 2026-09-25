@@ -1,0 +1,352 @@
+[
+  {
+    "url": "https://pickax.com/post/1",
+    "type": "text-only",
+    "notes": "earliest post on platform, @david, 2024-07-28",
+    "fetched": "2026-09-24"
+  },
+  {
+    "url": "https://pickax.com/post/500",
+    "type": "text-only",
+    "notes": "@JeffDornik, 2024-08-06, ~450 chars",
+    "fetched": "2026-09-24"
+  },
+  {
+    "url": "https://pickax.com/post/94115",
+    "type": "text-only",
+    "notes": "@Tapp_into_the_Truth, 2025-09-16",
+    "fetched": "2026-09-24"
+  },
+  {
+    "url": "https://pickax.com/post/730573",
+    "type": "text-only",
+    "notes": "@FeralHousewife, 2026-09-22",
+    "fetched": "2026-09-24"
+  },
+  {
+    "url": "https://pickax.com/post/738398",
+    "type": "text-only",
+    "notes": "@JeffDornik, 2026-09-22",
+    "fetched": "2026-09-24"
+  },
+  {
+    "url": "https://pickax.com/post/742949",
+    "type": "single-image",
+    "notes": "@ItsBoTime88, 2026-09-23",
+    "fetched": "2026-09-24"
+  },
+  {
+    "url": "https://pickax.com/post/750311",
+    "type": "single-image",
+    "notes": "@Denosko1, 2026-09-24",
+    "fetched": "2026-09-24"
+  },
+  {
+    "url": "https://pickax.com/post/753972",
+    "type": "single-image",
+    "notes": "@TheHoneyBadger, 2026-09-24",
+    "fetched": "2026-09-24"
+  },
+  {
+    "url": "https://pickax.com/post/326971",
+    "type": "single-image",
+    "notes": "@johnburke, 2026-05-14",
+    "fetched": "2026-09-24"
+  },
+  {
+    "url": "https://pickax.com/post/749934",
+    "type": "single-image",
+    "notes": "@Denosko1, 2026-09-24",
+    "fetched": "2026-09-24"
+  },
+  {
+    "url": "https://pickax.com/post/756154",
+    "type": "multi-image-2",
+    "notes": "@BeardedAv8r, 2026-09-24, 'show me what you drive'",
+    "fetched": "2026-09-24"
+  },
+  {
+    "url": "https://pickax.com/post/752016",
+    "type": "multi-image-2",
+    "notes": "@BleuWolf248, 2026-09-24",
+    "fetched": "2026-09-24"
+  },
+  {
+    "url": "https://pickax.com/post/750221",
+    "type": "multi-image-2",
+    "notes": "@KansasArchaeologist, 2026-09-24, 2 images",
+    "fetched": "2026-09-24"
+  },
+  {
+    "url": "https://pickax.com/post/755433",
+    "type": "multi-image-3",
+    "notes": "@NicsJourney, 2026-09-24, 3 images",
+    "fetched": "2026-09-24"
+  },
+  {
+    "url": "https://pickax.com/post/747090",
+    "type": "multi-image-3",
+    "notes": "@Jon, 2026-09-23, 3 images",
+    "fetched": "2026-09-24"
+  },
+  {
+    "url": "https://pickax.com/post/293434",
+    "type": "multi-image-3",
+    "notes": "@Chelie, 2026-04-22, 3 images",
+    "fetched": "2026-09-24"
+  },
+  {
+    "url": "https://pickax.com/post/757357",
+    "type": "multi-image-4plus",
+    "notes": "@Squirrel7, 2026-09-24, 5 images",
+    "fetched": "2026-09-24"
+  },
+  {
+    "url": "https://pickax.com/post/612126",
+    "type": "multi-image-4plus",
+    "notes": "@FeralHousewife, 2026-09-08, 4 images",
+    "fetched": "2026-09-24"
+  },
+  {
+    "url": "https://pickax.com/post/749350",
+    "type": "multi-image-4plus",
+    "notes": "@BeardedAv8r, 2026-09-23, 4 images",
+    "fetched": "2026-09-24"
+  },
+  {
+    "url": "https://pickax.com/post/728424",
+    "type": "rumble-video",
+    "notes": "@Pickax (verified), 2026-09-21, rumble video embed",
+    "fetched": "2026-09-24"
+  },
+  {
+    "url": "https://pickax.com/post/755581",
+    "type": "rumble-video",
+    "notes": "@LisaAPierce, 2026-09-24, rumble SHORTS embed",
+    "fetched": "2026-09-24"
+  },
+  {
+    "url": "https://pickax.com/post/11983",
+    "type": "rumble-video",
+    "notes": "@FreedomFirstNetwork, 2025-04-22, older rumble embed",
+    "fetched": "2026-09-24"
+  },
+  {
+    "url": "https://pickax.com/post/95731",
+    "type": "rumble-video",
+    "notes": "@ChavezFlexingtn, 2025-09-20, rumble embed",
+    "fetched": "2026-09-24"
+  },
+  {
+    "url": "https://pickax.com/post/756851",
+    "type": "native-video",
+    "notes": "@Denosko1, 2026-09-24",
+    "fetched": "2026-09-24"
+  },
+  {
+    "url": "https://pickax.com/post/741776",
+    "type": "native-video",
+    "notes": "@Erin, 2026-09-23",
+    "fetched": "2026-09-24"
+  },
+  {
+    "url": "https://pickax.com/post/753296",
+    "type": "native-video",
+    "notes": "@Stone, 2026-09-24",
+    "fetched": "2026-09-24"
+  },
+  {
+    "url": "https://pickax.com/post/755772",
+    "type": "native-video",
+    "notes": "@delmarvafarmwife, 2026-09-24",
+    "fetched": "2026-09-24"
+  },
+  {
+    "url": "https://pickax.com/post/706574",
+    "type": "link-card",
+    "notes": "@Pickax, pickax.shop merch link card",
+    "fetched": "2026-09-24"
+  },
+  {
+    "url": "https://pickax.com/post/3085",
+    "type": "link-card",
+    "notes": "@TLA, 2024-10-26, thegatewaypundit.com news card",
+    "fetched": "2026-09-24"
+  },
+  {
+    "url": "https://pickax.com/post/274937",
+    "type": "link-card",
+    "notes": "@AmericaMission, 2026-03-31, supremecourt.gov card",
+    "fetched": "2026-09-24"
+  },
+  {
+    "url": "https://pickax.com/post/729026",
+    "type": "link-card",
+    "notes": "@MrsPudge, brettmurphyx.com card",
+    "fetched": "2026-09-24"
+  },
+  {
+    "url": "https://pickax.com/post/758287",
+    "type": "link-card",
+    "notes": "@Ben, whyy.org news card",
+    "fetched": "2026-09-24"
+  },
+  {
+    "url": "https://pickax.com/post/756174",
+    "type": "quote",
+    "notes": "@FeralHousewife quotes @SecondAmendment, 2026-09-24",
+    "fetched": "2026-09-24"
+  },
+  {
+    "url": "https://pickax.com/post/757778",
+    "type": "quote",
+    "notes": "@FeralHousewife quote, 2026-09-24",
+    "fetched": "2026-09-24"
+  },
+  {
+    "url": "https://pickax.com/post/7036",
+    "type": "quote",
+    "notes": "@RachelAlexander, 2025-02-24, quote OF AN ARTICLE (id 4999)",
+    "fetched": "2026-09-24"
+  },
+  {
+    "url": "https://pickax.com/post/100",
+    "type": "quote",
+    "notes": "@FreedomFirstNetwork, 2024-08-01, quote of article id 99",
+    "fetched": "2026-09-24"
+  },
+  {
+    "url": "https://pickax.com/post/747756",
+    "type": "nested-quote-2",
+    "notes": "@Squirrel7 -> @suzannearjona -> @FeralHousewife, depth 2",
+    "fetched": "2026-09-24"
+  },
+  {
+    "url": "https://pickax.com/post/740090",
+    "type": "nested-quote-2",
+    "notes": "@Erin -> @SentinelDir -> @MarkKusRK200, depth 2",
+    "fetched": "2026-09-24"
+  },
+  {
+    "url": "https://pickax.com/post/758439",
+    "type": "nested-quote-2",
+    "notes": "@LisaAPierce -> @TheHoneyBadger -> @Lfleezy23, depth 2",
+    "fetched": "2026-09-24"
+  },
+  {
+    "url": "https://pickax.com/post/752634",
+    "type": "nested-quote-3plus",
+    "notes": "@KansasArchaeologist -> @DailyComicals -> @Jonsaysx -> @BeardedNurseDad, depth 3",
+    "fetched": "2026-09-24"
+  },
+  {
+    "url": "https://pickax.com/post/747331",
+    "type": "nested-quote-3plus",
+    "notes": "@halfpineforge -> @Jonsaysx -> @BeardedNurseDad -> @FeralHousewife, depth 3",
+    "fetched": "2026-09-24"
+  },
+  {
+    "url": "https://pickax.com/post/716654",
+    "type": "article",
+    "notes": "@BleuWolf248, 2026-09-20, 'PROBLEM? Group Shoutouts & Welcome Parties'",
+    "fetched": "2026-09-24"
+  },
+  {
+    "url": "https://pickax.com/post/4944",
+    "type": "article",
+    "notes": "@RachelAlexander, 2025-01-10, older article",
+    "fetched": "2026-09-24"
+  },
+  {
+    "url": "https://pickax.com/post/99",
+    "type": "article",
+    "notes": "@FreedomFirstNetwork, 2024-08-01, article quoted by post 100",
+    "fetched": "2026-09-24"
+  },
+  {
+    "url": "https://pickax.com/post/675064",
+    "type": "article",
+    "notes": "@KansasArchaeologist, 2026-09-17",
+    "fetched": "2026-09-24"
+  },
+  {
+    "url": "https://pickax.com/post/734197",
+    "type": "very-long-text",
+    "notes": "@cperez3220, 2026-09-22, ~1018 chars (platform caps at 1000)",
+    "fetched": "2026-09-24"
+  },
+  {
+    "url": "https://pickax.com/post/756065",
+    "type": "very-long-text",
+    "notes": "@Habetman, 2026-09-24, ~999 chars",
+    "fetched": "2026-09-24"
+  },
+  {
+    "url": "https://pickax.com/post/733482",
+    "type": "very-long-text",
+    "notes": "@EmeraldPoker, 2026-09-22, ~999 chars",
+    "fetched": "2026-09-24"
+  },
+  {
+    "url": "https://pickax.com/post/739902",
+    "type": "no-avatar",
+    "notes": "@wellrested3, 2026-09-23, null avatar",
+    "fetched": "2026-09-24"
+  },
+  {
+    "url": "https://pickax.com/post/758350",
+    "type": "no-avatar",
+    "notes": "@wellrested3, 2026-09-24, null avatar",
+    "fetched": "2026-09-24"
+  },
+  {
+    "url": "https://pickax.com/post/684133",
+    "type": "no-avatar",
+    "notes": "@healthranger (verified), 2026-09-18, null avatar",
+    "fetched": "2026-09-24"
+  },
+  {
+    "url": "https://pickax.com/post/755797",
+    "type": "special-formatting",
+    "notes": "@suzannearjona, 2026-09-24, bold/links/hashtags/emoji",
+    "fetched": "2026-09-24"
+  },
+  {
+    "url": "https://pickax.com/post/1583",
+    "type": "special-formatting",
+    "notes": "@Yossishow, 2024-09-19, 1314-char formatted link post",
+    "fetched": "2026-09-24"
+  },
+  {
+    "url": "https://pickax.com/post/126499",
+    "type": "special-formatting",
+    "notes": "@jeffhertzog, 2025-12-06, formatted + frontpagemag link",
+    "fetched": "2026-09-24"
+  },
+  {
+    "url": "https://pickax.com/post/757481",
+    "type": "special-formatting",
+    "notes": "@LaAmericana, 2026-09-24",
+    "fetched": "2026-09-24"
+  },
+  {
+    "summary": {
+      "text-only": 5,
+      "single-image": 5,
+      "multi-image-2": 3,
+      "multi-image-3": 3,
+      "multi-image-4plus": 3,
+      "rumble-video": 4,
+      "native-video": 4,
+      "link-card": 5,
+      "quote": 4,
+      "nested-quote-2": 3,
+      "nested-quote-3plus": 2,
+      "article": 4,
+      "very-long-text": 3,
+      "no-avatar": 3,
+      "special-formatting": 4
+    },
+    "total": 55
+  }
+]
