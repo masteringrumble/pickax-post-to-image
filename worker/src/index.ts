@@ -763,17 +763,52 @@ export function extract(html: string, postId: string, postUrl: string): PostPayl
   };
 }
 
-function jsonResponse(data: unknown, status = 200): Response {
+function jsonResponse(data: unknown, status = 200, cors: string | null = "*"): Response {
   return new Response(JSON.stringify(data), {
     status,
     headers: {
       "Content-Type": "application/json",
-      "Access-Control-Allow-Origin": "*",
+      // Reflected caller origin on the locked-down custom domain, "*" on
+      // the workers.dev route (extension + legacy callers), omitted for
+      // non-browser requests where CORS doesn't apply.
+      ...(cors ? { "Access-Control-Allow-Origin": cors } : {}),
       // Successful post payloads are public and safe to cache (5 min).
       // Errors are never cached — a cached 404/502 would poison retries.
       "Cache-Control": status === 200 ? "public, max-age=300" : "no-store",
     },
   });
+}
+
+// Origins allowed to call the worker from a web page. The custom domain is
+// locked to our own site so other websites can't piggyback on it in their
+// pages; the workers.dev route stays open for the published browser
+// extension. Direct non-browser requests (curl, address-bar navigation)
+// carry no Origin and are still allowed — abuse is handled by rate
+// limiting at the edge, since headers are trivially spoofable anyway.
+const ALLOWED_ORIGINS = new Set([
+  "https://www.pickax2image.top",
+  "https://pickax2image.top",
+  "https://masteringrumble.github.io",
+]);
+
+function originAllowed(request: Request): boolean {
+  const origin = request.headers.get("Origin");
+  if (origin) return ALLOWED_ORIGINS.has(origin);
+  const referer = request.headers.get("Referer");
+  if (referer) {
+    try {
+      return ALLOWED_ORIGINS.has(new URL(referer).origin);
+    } catch {
+      return false;
+    }
+  }
+  return true;
+}
+
+function corsFor(request: Request, isApiDomain: boolean): string | null {
+  if (!isApiDomain) return "*";
+  const origin = request.headers.get("Origin");
+  return origin && ALLOWED_ORIGINS.has(origin) ? origin : null;
 }
 
 export default {
@@ -783,6 +818,19 @@ export default {
     ctx: ExecutionContext
   ): Promise<Response> {
     const url = new URL(request.url);
+    const isApiDomain = url.hostname === "api.pickax2image.top";
+    // Lock the custom domain to our own site: requests from other websites'
+    // pages are rejected here (bare 403, no usage tips for pokers).
+    if (isApiDomain && !originAllowed(request)) {
+      return new Response(JSON.stringify({ error: "forbidden" }), {
+        status: 403,
+        headers: {
+          "Content-Type": "application/json",
+          "Cache-Control": "no-store",
+        },
+      });
+    }
+    const cors = corsFor(request, isApiDomain);
     // Edge cache for successful responses. Keyed by the full request URL,
     // so /post?url=<post> and /img?url=<image> each cache independently.
     // This collapses traffic spikes: one pickax.com fetch serves every
@@ -795,7 +843,7 @@ export default {
     if (request.method === "OPTIONS") {
       return new Response(null, {
         headers: {
-          "Access-Control-Allow-Origin": "*",
+          ...(cors ? { "Access-Control-Allow-Origin": cors } : {}),
           "Access-Control-Allow-Methods": "GET, OPTIONS",
         },
       });
@@ -812,7 +860,7 @@ export default {
       try {
         parsed = new URL(target);
       } catch {
-        return jsonResponse({ error: "invalid-url" }, 400);
+        return jsonResponse({ error: "invalid-url" }, 400, cors);
       }
       // Locked down: only proxy Pickax's image CDN and Rumble's thumbnail
       // CDN (post attachments + video posters), nothing else.
@@ -820,10 +868,7 @@ export default {
       const allowed =
         host === "img.pickax.com" || host.endsWith(".cdn.rumble.cloud");
       if (parsed.protocol !== "https:" || !allowed) {
-        return jsonResponse(
-          { error: "invalid-url", hint: "Only Pickax/Rumble image CDN URLs are proxied" },
-          400
-        );
+        return jsonResponse({ error: "invalid-url" }, 400, cors);
       }
       let res: Response;
       try {
@@ -831,16 +876,16 @@ export default {
           headers: { "User-Agent": "pickax-post-to-image/1.0" },
         });
       } catch {
-        return jsonResponse({ error: "fetch-failed" }, 502);
+        return jsonResponse({ error: "fetch-failed" }, 502, cors);
       }
       if (!res.ok) {
-        return jsonResponse({ error: "fetch-failed", hint: `img.pickax.com returned ${res.status}` }, 502);
+        return jsonResponse({ error: "fetch-failed" }, 502, cors);
       }
       const contentType = res.headers.get("Content-Type") ?? "image/jpeg";
       const out = new Response(res.body, {
         headers: {
           "Content-Type": contentType,
-          "Access-Control-Allow-Origin": "*",
+          ...(cors ? { "Access-Control-Allow-Origin": cors } : {}),
           // Images are effectively immutable: cache a week.
           "Cache-Control": "public, max-age=604800",
         },
@@ -850,16 +895,13 @@ export default {
     }
 
     if (url.pathname !== "/post") {
-      return jsonResponse({ error: "not-found", hint: "Use /post?url=https://pickax.com/post/<id>" }, 404);
+      return jsonResponse({ error: "not-found" }, 404, cors);
     }
 
     const target = (url.searchParams.get("url") ?? "").trim();
     const m = target.match(POST_URL_RE);
     if (!m) {
-      return jsonResponse(
-        { error: "invalid-url", hint: "Expected a public Pickax post URL like https://pickax.com/post/707864" },
-        400,
-      );
+      return jsonResponse({ error: "invalid-url" }, 400, cors);
     }
     const postId = m[1];
     const canonical = `https://pickax.com/post/${postId}`;
@@ -881,16 +923,16 @@ export default {
         },
       });
     } catch {
-      return jsonResponse({ error: "fetch-failed", hint: "Could not reach pickax.com" }, 502);
+      return jsonResponse({ error: "fetch-failed" }, 502, cors);
     }
 
-    if (res.status === 404) return jsonResponse({ error: "not-found", hint: "Pickax returned 404 for this post" }, 404);
-    if (!res.ok) return jsonResponse({ error: "fetch-failed", hint: `pickax.com returned ${res.status}` }, 502);
+    if (res.status === 404) return jsonResponse({ error: "not-found" }, 404, cors);
+    if (!res.ok) return jsonResponse({ error: "fetch-failed" }, 502, cors);
 
     const html = await res.text();
     const payload = extract(html, postId, canonical);
-    if (!payload) return jsonResponse({ error: "not-found", hint: "No recognizable post content on this page" }, 404);
-    const out = jsonResponse(payload);
+    if (!payload) return jsonResponse({ error: "not-found" }, 404, cors);
+    const out = jsonResponse(payload, 200, cors);
     ctx.waitUntil(cache.put(postCacheKey, out.clone()));
     return out;
   },
