@@ -14,6 +14,7 @@ import {
   type ParsedImport,
 } from "./importHtml";
 import { renderPostImage } from "./renderer";
+import ConsentBanner from "./ConsentBanner";
 import {
   DEFAULT_RENDER_OPTIONS,
   type LoadedImage,
@@ -527,7 +528,10 @@ export default function App() {
 
   return (
     <div className="page">
-      <main className="card-wrap">
+      <a className="skip-link" href="#main-content">
+        Skip to main content
+      </a>
+      <main className="card-wrap" id="main-content">
         <header className="hero">
           <span className="brand-mark" aria-hidden="true">
             <svg viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
@@ -562,7 +566,7 @@ export default function App() {
               }}
               autoFocus
             />
-            {error && <p className="error">{error}</p>}
+            {error && <p className="error" role="alert">{error}</p>}
             <button className="btn primary" onClick={handleGenerateFromUrl}>
               Generate Image
             </button>
@@ -589,6 +593,7 @@ export default function App() {
                 href="https://chromewebstore.google.com/detail/ailpedkkcffcdjkimccmhgimfefgdppl"
                 target="_blank"
                 rel="noopener noreferrer"
+                aria-label="Available in the Chrome Web Store (opens in a new tab)"
               >
                 <img
                   src="./badges/chrome-web-store.png"
@@ -600,6 +605,7 @@ export default function App() {
                 href="https://addons.mozilla.org/en-US/firefox/addon/pickax-post-to-image/"
                 target="_blank"
                 rel="noopener noreferrer"
+                aria-label="Get the add-on for Firefox (opens in a new tab)"
               >
                 <img
                   src="./badges/firefox-get-the-addon.svg"
@@ -615,14 +621,14 @@ export default function App() {
         {stage === "loading" && (
           <section className="panel center">
             <div className="spinner" aria-hidden="true" />
-            <p className="muted">Reading the Pickax post…</p>
+            <p className="muted" role="status">Reading the Pickax post…</p>
           </section>
         )}
 
         {stage === "manual" && (
           <section className="panel">
             {notice && <p className="notice">{notice}</p>}
-            {error && <p className="error">{error}</p>}
+            {error && <p className="error" role="alert">{error}</p>}
 
             <div className="grid-2">
               <div>
@@ -752,6 +758,7 @@ export default function App() {
               <input
                 className="text-input"
                 type="url"
+                aria-label="Profile picture image URL"
                 placeholder="…or paste a profile picture URL"
                 value={avatarUrl}
                 onChange={(e) => setAvatarUrl(e.target.value)}
@@ -775,6 +782,7 @@ export default function App() {
               <input
                 className="text-input"
                 type="url"
+                aria-label="Post image URL — press Add to attach it"
                 placeholder="…or paste an image URL and press Add"
                 value={imageUrl}
                 onChange={(e) => setImageUrl(e.target.value)}
@@ -826,7 +834,7 @@ export default function App() {
         {stage === "preview" && (
           <section className="panel">
             {notice && <p className="notice">{notice}</p>}
-            {error && <p className="error">{error}</p>}
+            {error && <p className="error" role="alert">{error}</p>}
             <h2 className="preview-title">Generated Pickax Image</h2>
             {previewUrl && (
               <img
@@ -874,7 +882,12 @@ export default function App() {
         <span>Images are built in your browser — nothing of yours is uploaded or stored</span>
         <span className="dot">•</span>
         <span>Not affiliated with Pickax</span>
+        <span className="dot">•</span>
+        <a href="./privacy.html" className="footer-link">
+          Privacy Policy
+        </a>
       </footer>
+      <ConsentBanner />
     </div>
   );
 }
