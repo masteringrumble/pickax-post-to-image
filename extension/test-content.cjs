@@ -586,6 +586,72 @@ ${feedCard("222222", "bob", "Bob B", "u-bob/b.jpeg", "3 hours ago", "p-222/photo
     "",
     "cursor restored after Esc"
   );
+
+  // Touch: a tap (touchstart/touchend with no movement) selects the card
+  // under the finger directly — there is no hover step on touch screens.
+  const innerBtn2 = card2.querySelector(".actions button");
+  docF.elementFromPoint = function () {
+    return innerBtn2;
+  };
+  pickerF.start();
+  function touchEv(type, x, y) {
+    const ev = new domF.window.Event(type, {
+      bubbles: true,
+      cancelable: true,
+    });
+    ev.changedTouches = [{ clientX: x, clientY: y }];
+    ev.touches = type === "touchstart" ? [{ clientX: x, clientY: y }] : [];
+    return ev;
+  }
+  docF.dispatchEvent(touchEv("touchstart", 50, 60));
+  const tapEnd = touchEv("touchend", 52, 61); // ~2px: a tap, not a scroll
+  let tapDefaultPrevented = false;
+  const origPrevent = tapEnd.preventDefault.bind(tapEnd);
+  tapEnd.preventDefault = function () {
+    tapDefaultPrevented = true;
+    return origPrevent();
+  };
+  docF.dispatchEvent(tapEnd);
+  await new Promise((r) => setTimeout(r, 30));
+  assert.ok(tapDefaultPrevented, "tap cancels the compatibility click");
+  const touchPanel = docF.getElementById("pickax-post-to-image-panel-backdrop");
+  assert.ok(touchPanel, "tap opens the options panel");
+  assert.equal(
+    sentMsgs[sentMsgs.length - 1].payload.postId,
+    "222222",
+    "tap picked card 2"
+  );
+  assert.equal(
+    sentMsgs[sentMsgs.length - 1].payload.username,
+    "bob",
+    "no cross-card bleed on tap"
+  );
+  touchPanel.querySelector("[data-ppi-download]").click();
+  await new Promise((r) => setTimeout(r, 30));
+  assert.equal(
+    docF.getElementById("pickax-post-to-image-panel-backdrop"),
+    null,
+    "panel closed after Download"
+  );
+
+  // A touch that moves is a scroll: the picker stays open, nothing picked.
+  pickerF.start();
+  const sentBeforeScroll = sentMsgs.length;
+  docF.dispatchEvent(touchEv("touchstart", 50, 60));
+  docF.dispatchEvent(touchEv("touchend", 50, 200)); // 140px: a scroll
+  await new Promise((r) => setTimeout(r, 30));
+  assert.equal(sentMsgs.length, sentBeforeScroll, "scroll sends nothing");
+  assert.equal(
+    docF.getElementById("pickax-post-to-image-panel-backdrop"),
+    null,
+    "no panel on scroll"
+  );
+  assert.equal(
+    docF.documentElement.style.cursor,
+    "crosshair",
+    "picker still active after scroll"
+  );
+  pickerF.stop();
   delete globalThis.chrome; // don't leak the stub into other sections
 
   // Scoped extraction still works directly (no cross-card bleed).

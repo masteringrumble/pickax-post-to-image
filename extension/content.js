@@ -658,6 +658,11 @@
 
     pickPill = document.createElement("div");
     var iconUrl = ICON_DATA_URL;
+    // Touch screens have no hover: the picker is tap-to-select there.
+    var isTouchDevice =
+      typeof window !== "undefined" &&
+      (("ontouchstart" in window) ||
+        (typeof navigator !== "undefined" && navigator.maxTouchPoints > 0));
     pickPill.innerHTML =
       (iconUrl
         ? '<img src="' +
@@ -665,11 +670,16 @@
           '" alt="" style="width:18px;height:18px;border-radius:4px;' +
           'vertical-align:-4px;margin-right:8px;pointer-events:none;">'
         : "") +
-      "<span>Click a post to turn it into an image</span>" +
+      "<span>" +
+      (isTouchDevice
+        ? "Tap a post to turn it into an image"
+        : "Click a post to turn it into an image") +
+      "</span>" +
       '<span style="opacity:.65;margin-left:10px;">Esc to cancel</span>';
     pickPill.style.cssText =
       "position:fixed;left:50%;top:18px;transform:translateX(-50%);" +
-      "z-index:2147483647;pointer-events:none;white-space:nowrap;" +
+      "z-index:2147483647;pointer-events:none;max-width:94vw;" +
+      "white-space:normal;text-align:center;" +
       "background:rgba(20,26,40,.96);color:#fff;font-size:14px;" +
       "font-family:system-ui,sans-serif;padding:10px 18px;" +
       "border-radius:9999px;border:1px solid #3EB1F9;" +
@@ -730,6 +740,53 @@
       e.preventDefault();
       stopPicker();
     }
+  }
+
+  // Touch screens have no hover, so the highlight-then-click flow can't
+  // work there. Instead a tap selects the card under the finger directly.
+  // A tap is a touchstart/touchend pair with almost no movement — anything
+  // that moved further was a scroll and must pass through untouched.
+  var touchSX = 0;
+  var touchSY = 0;
+  var touchDown = false;
+
+  function onPickTouchStart(e) {
+    if (!picking) return;
+    var t = e.changedTouches && e.changedTouches[0];
+    if (!t || (e.touches && e.touches.length > 1)) {
+      touchDown = false;
+      return;
+    }
+    touchDown = true;
+    touchSX = t.clientX;
+    touchSY = t.clientY;
+  }
+
+  function onPickTouchEnd(e) {
+    if (!picking || !touchDown) return;
+    touchDown = false;
+    var t = e.changedTouches && e.changedTouches[0];
+    if (!t) return;
+    var dx = t.clientX - touchSX;
+    var dy = t.clientY - touchSY;
+    if (dx * dx + dy * dy > 144) return; // moved: it was a scroll, not a tap
+    var el =
+      typeof document.elementFromPoint === "function"
+        ? document.elementFromPoint(t.clientX, t.clientY)
+        : e.target;
+    var card = cardFromElement(el);
+    if (!card) return; // empty taps pass through
+    // Cancel the compatibility mouse/click events so the card's overlay
+    // link can't navigate away after we open the panel.
+    e.preventDefault();
+    e.stopPropagation();
+    var postId = postIdFromCard(card);
+    stopPicker();
+    if (!postId) {
+      toast("Couldn't read that post.");
+      return;
+    }
+    openPanelForCard(card, postId);
   }
 
   // -------------------------------------------------------------------------
@@ -1038,6 +1095,17 @@
     document.addEventListener("click", onPickClick, true);
     document.addEventListener("keydown", onPickKey, true);
     document.addEventListener("scroll", onPickScroll, true);
+    // Touch: no hover exists, so taps select the card directly
+    // (see onPickTouchEnd). Non-passive so the tap can cancel the
+    // compatibility click that would otherwise follow it.
+    document.addEventListener("touchstart", onPickTouchStart, {
+      capture: true,
+      passive: true,
+    });
+    document.addEventListener("touchend", onPickTouchEnd, {
+      capture: true,
+      passive: false,
+    });
   }
 
   function stopPicker() {
@@ -1049,6 +1117,8 @@
     document.removeEventListener("click", onPickClick, true);
     document.removeEventListener("keydown", onPickKey, true);
     document.removeEventListener("scroll", onPickScroll, true);
+    document.removeEventListener("touchstart", onPickTouchStart, true);
+    document.removeEventListener("touchend", onPickTouchEnd, true);
     document.documentElement.style.cursor = savedCursor;
     if (pickHL) pickHL.style.display = "none";
     if (pickPill && pickPill.parentNode)
