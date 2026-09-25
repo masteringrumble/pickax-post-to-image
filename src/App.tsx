@@ -578,12 +578,13 @@ export default function App() {
               <span>or do it in one click</span>
             </div>
 
-            <h2 className="fast-title">Get the browser extension</h2>
-            <p className="muted small">
-              Turn any Pickax post into an image with one click, right from the
-              post page.
-            </p>
-            <div className="store-badges">
+            <div className="ext-promo">
+              <h2 className="fast-title">Get the browser extension</h2>
+              <p className="muted small">
+                Turn any Pickax post into an image with one click, right from
+                the post page.
+              </p>
+              <div className="store-badges">
               <a
                 href="https://chromewebstore.google.com/detail/ailpedkkcffcdjkimccmhgimfefgdppl"
                 target="_blank"
@@ -606,6 +607,7 @@ export default function App() {
                   height={46}
                 />
               </a>
+            </div>
             </div>
           </section>
         )}

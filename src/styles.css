@@ -415,6 +415,10 @@ body {
   margin: 14px 0 4px;
 }
 
+.ext-promo {
+  text-align: center;
+}
+
 .store-badges img {
   display: block;
   height: 46px;
