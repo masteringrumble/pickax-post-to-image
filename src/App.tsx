@@ -578,9 +578,7 @@ export default function App() {
               Generate Image
             </button>
             <p className="hint">
-              Only public posts. What you make stays in your browser — we never
-              see it or store it. The post's own photos may sit in our cache
-              up to 7 days for speed.
+              Only public posts.
               {!workerConfigured() && (
                 <> Automatic import is still being switched on for this copy of the app.</>
               )}
