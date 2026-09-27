@@ -547,9 +547,9 @@ export default function App() {
               <path d="M4.5 17.5 10 12l3.5 3.5 3-3 3 3" />
             </svg>
           </span>
-          <h1>
+          <p className="hero-h1">
             Pickax <span className="accent">Post to Image</span>
-          </h1>
+          </p>
           <p className="tagline">
             Turn any Pickax post into a clean, shareable image.
           </p>
@@ -885,7 +885,7 @@ export default function App() {
         <span>
           Don&apos;t have a Pickax account?{' '}
           <a
-            href="https://pickax.com/?referralCode=9bgj0rc&refSource=copy"
+            href="https://pickax.com"
             className="footer-link"
             target="_blank"
             rel="noopener noreferrer"

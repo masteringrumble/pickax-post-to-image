@@ -50,10 +50,92 @@
       @media (max-width: 1024px) {
         #bmc-wbtn { bottom: 84px !important; }
       }
+      /* Static SEO block: plain HTML below the app so crawlers that don't
+         run JavaScript (notably Bing's) can read what the page is about.
+         Kept visually quiet — the tool stays the whole first screen. */
+      .static-seo {
+        max-width: 640px;
+        margin: 0 auto;
+        padding: 56px 20px 40px;
+        color: #9aa3b2;
+        font-family: "Mulish", system-ui, sans-serif;
+        font-size: 0.95rem;
+        line-height: 1.65;
+        border-top: 1px solid rgba(255, 255, 255, 0.07);
+      }
+      .static-seo h1 {
+        font-family: "Poppins", "Mulish", sans-serif;
+        font-size: 1.35rem;
+        font-weight: 700;
+        color: #e8ecf3;
+        letter-spacing: -0.01em;
+        margin: 0 0 28px;
+        text-align: center;
+      }
+      .static-seo h2 {
+        font-family: "Poppins", "Mulish", sans-serif;
+        font-size: 1.05rem;
+        font-weight: 600;
+        color: #d5dbe6;
+        margin: 28px 0 8px;
+      }
+      .static-seo h3 {
+        font-size: 0.95rem;
+        font-weight: 700;
+        color: #c3cad7;
+        margin: 16px 0 4px;
+      }
+      .static-seo p { margin: 0 0 12px; }
+      .static-seo ol { margin: 0 0 12px; padding-left: 22px; }
+      .static-seo ol li { margin-bottom: 4px; }
+      .static-seo a { color: #6cb8f0; }
     </style>
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "FAQPage",
+      "mainEntity": [
+        {
+          "@type": "Question",
+          "name": "Is Pickax2Image free?",
+          "acceptedAnswer": { "@type": "Answer", "text": "Yes. Pickax2Image is free to use, with no sign-up required." }
+        },
+        {
+          "@type": "Question",
+          "name": "Is Pickax2Image affiliated with Pickax?",
+          "acceptedAnswer": { "@type": "Answer", "text": "No. Pickax2Image is an independent third-party tool for Pickax posts. It is not affiliated with, endorsed by, or partnered with Pickax." }
+        },
+        {
+          "@type": "Question",
+          "name": "Does Pickax2Image work with X/Twitter or other social networks?",
+          "acceptedAnswer": { "@type": "Answer", "text": "No. Pickax2Image is designed specifically for Pickax posts and does not convert posts from X/Twitter or any other social network." }
+        }
+      ]
+    }
+    </script>
   </head>
   <body>
     <div id="root"></div>
+    <section class="static-seo">
+      <h1>Pickax2Image</h1>
+      <h2>What is Pickax?</h2>
+      <p>Pickax is an algorithm-free social media platform founded by Jeff Dornik, with algorithm-free feeds. Pickax — sometimes called Pickax Social — supports short posts, long-form articles, and Rumble videos right in the feed. <a href="https://pickax.com">Visit Pickax</a>.</p>
+      <h2>How to turn a Pickax post into an image</h2>
+      <p>To turn a Pickax post into an image, use Pickax2Image:</p>
+      <ol>
+        <li>Copy the Pickax post link (it looks like https://pickax.com/post/######).</li>
+        <li>Paste it into the tool above and press Generate Image.</li>
+        <li>Preview the result and download the finished PNG.</li>
+      </ol>
+      <p>Pickax2Image is a free Pickax post to image converter. The image is built in your browser from the post's actual content — no screenshot needed, no sign-up. It works with Pickax posts only, not posts from other social networks.</p>
+      <h2>Frequently asked questions</h2>
+      <h3>Is Pickax2Image free?</h3>
+      <p>Yes. Pickax2Image is free to use, with no sign-up required.</p>
+      <h3>Is Pickax2Image affiliated with Pickax?</h3>
+      <p>No. Pickax2Image is an independent third-party tool and is not affiliated with, endorsed by, or partnered with Pickax.</p>
+      <h3>Does Pickax2Image work with X/Twitter or other social networks?</h3>
+      <p>No. Pickax2Image is designed specifically for Pickax posts.</p>
+    </section>
     <script type="module" src="./src/main.tsx"></script>
   </body>
 </html>

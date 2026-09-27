@@ -73,7 +73,8 @@ body {
   height: 30px;
 }
 
-.hero h1 {
+.hero h1,
+.hero .hero-h1 {
   font-family: "Poppins", "Mulish", sans-serif;
   font-weight: 700;
   font-size: 2rem;
@@ -81,7 +82,8 @@ body {
   letter-spacing: -0.02em;
 }
 
-.hero h1 .accent {
+.hero h1 .accent,
+.hero .hero-h1 .accent {
   color: var(--accent);
 }
 
@@ -511,7 +513,8 @@ kbd {
     padding: 20px;
   }
 
-  .hero h1 {
+  .hero h1,
+  .hero .hero-h1 {
     font-size: 1.6rem;
   }
 
