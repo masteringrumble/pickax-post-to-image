@@ -13,7 +13,6 @@ import {
   prettyTimestamp,
   type ParsedImport,
 } from "./importHtml";
-import { renderPostImage } from "./renderer";
 import ConsentBanner from "./ConsentBanner";
 import { trackEvent } from "./analytics";
 import {
@@ -269,7 +268,9 @@ export default function App() {
     dataRef.current = data;
     setPreviewData(data);
     setOptions(opts);
-    const canvas = await renderPostImage(data, opts);
+    const canvas = await (
+      await import("./renderer")
+    ).renderPostImage(data, opts);
     canvasRef.current = canvas;
     setPreviewUrl(canvas.toDataURL("image/png"));
     setStage("preview");
@@ -280,7 +281,9 @@ export default function App() {
     const data = dataRef.current;
     if (!data) return;
     try {
-      const canvas = await renderPostImage(data, next);
+      const canvas = await (
+        await import("./renderer")
+      ).renderPostImage(data, next);
       canvasRef.current = canvas;
       setPreviewUrl(canvas.toDataURL("image/png"));
     } catch {
@@ -607,6 +610,7 @@ export default function App() {
                   src="./badges/chrome-web-store.png"
                   alt="Available in the Chrome Web Store"
                   height={46}
+                  width={163}
                 />
               </a>
               <a
@@ -619,6 +623,7 @@ export default function App() {
                   src="./badges/firefox-get-the-addon.svg"
                   alt="Get the Add-on for Firefox"
                   height={46}
+                  width={132}
                 />
               </a>
             </div>
