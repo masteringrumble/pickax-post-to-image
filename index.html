@@ -67,6 +67,11 @@
         border-top: 1px solid rgba(255, 255, 255, 0.07);
       }
       body.app-ready .static-seo { display: block; }
+      /* The floating Buy Me a Coffee button overlaps page text on small
+         screens — hide it on mobile. Desktop keeps the floating widget. */
+      @media (max-width: 640px) {
+        #bmc-wbtn { display: none !important; }
+      }
       .static-seo h1 {
         font-family: "Poppins", "Mulish", sans-serif;
         font-size: 1.35rem;
