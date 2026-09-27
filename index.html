@@ -54,6 +54,9 @@
          run JavaScript (notably Bing's) can read what the page is about.
          Kept visually quiet — the tool stays the whole first screen. */
       .static-seo {
+        display: none; /* hidden until the app mounts — avoids a flash of this
+                          block before React renders. Crawlers still read it
+                          in the HTML source. */
         max-width: 640px;
         margin: 0 auto;
         padding: 56px 20px 40px;
@@ -63,6 +66,7 @@
         line-height: 1.65;
         border-top: 1px solid rgba(255, 255, 255, 0.07);
       }
+      body.app-ready .static-seo { display: block; }
       .static-seo h1 {
         font-family: "Poppins", "Mulish", sans-serif;
         font-size: 1.35rem;

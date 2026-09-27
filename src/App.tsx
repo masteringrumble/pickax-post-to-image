@@ -225,6 +225,9 @@ export default function App() {
 
   // One-click import: the bookmarklet opens the app with #import=<data>.
   useEffect(() => {
+    // Reveal the static SEO block only once the app has rendered, so it
+    // never flashes on screen during load.
+    document.body.classList.add("app-ready");
     const imported = parseImportHash();
     if (!imported) return;
     clearImportHash();
